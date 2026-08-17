@@ -49,14 +49,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Xung-Chan/xungchan-ekyc-core.git"
+    "url": "git+https://github.com/Xung-Chan/ekyc-core.git"
   },
   "author": "Nguyễn Mai Duy Trường <nmdtruong18032004@gmail.com> (https://github.com/Xung-Chan)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Xung-Chan/xungchan-ekyc-core/issues"
+    "url": "https://github.com/Xung-Chan/ekyc-core/issues"
   },
-  "homepage": "https://github.com/Xung-Chan/xungchan-ekyc-core#readme",
+  "homepage": "https://github.com/Xung-Chan/ekyc-core#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
@@ -116,11 +116,11 @@
     ]
   },
   "codegenConfig": {
-    "name": "EkycCoreSpec",
+    "name": "FacePortraitSpec",
     "type": "modules",
     "jsSrcsDir": "src",
     "android": {
-      "javaPackageName": "com.ekyccore"
+      "javaPackageName": "com.faceportrait"
     }
   },
   "prettier": {

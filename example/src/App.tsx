@@ -1,9 +1,9 @@
-import { startEkyc } from '@xungchan/ekyc-core';
+import { finalizeFromPath } from '@xungchan/ekyc-core';
 import { Button, StyleSheet, View } from 'react-native';
 
 export default function App() {
   const handlePress = async () => {
-    const result = await startEkyc();
+    const result = await finalizeFromPath({ imagePath: '' });
     console.log(result);
   };
   return (
