@@ -1,1 +1,1 @@
-export * from './FacePortraitCameraView'
+export * from './FacePortraitCameraView';

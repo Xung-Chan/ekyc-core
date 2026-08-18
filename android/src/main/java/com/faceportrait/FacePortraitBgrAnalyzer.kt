@@ -283,17 +283,35 @@ internal object FacePortraitBgrAnalyzer {
     val raw = BitmapFactory.decodeFile(path) ?: return null
     return try {
       val ex = ExifInterface(path)
-      val orientation =
+      var orientation =
         ex.getAttributeInt(
           ExifInterface.TAG_ORIENTATION,
           ExifInterface.ORIENTATION_NORMAL,
         )
+      Log.d(TAG, "loadOrientedBitmap: raw size=${raw.width}x${raw.height}, exif orientation=$orientation")
+      if ((orientation == ExifInterface.ORIENTATION_NORMAL || orientation == ExifInterface.ORIENTATION_UNDEFINED)
+          && raw.width > raw.height) {
+        orientation = ExifInterface.ORIENTATION_ROTATE_270
+        Log.d(TAG, "loadOrientedBitmap: Fallback rotation to 270 degrees applied.")
+      }
       val matrix = Matrix()
       when (orientation) {
         ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
         ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
         ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
         ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+        ExifInterface.ORIENTATION_FLIP_VERTICAL -> {
+          matrix.postRotate(180f)
+          matrix.postScale(-1f, 1f)
+        }
+        ExifInterface.ORIENTATION_TRANSPOSE -> {
+          matrix.postRotate(90f)
+          matrix.postScale(-1f, 1f)
+        }
+        ExifInterface.ORIENTATION_TRANSVERSE -> {
+          matrix.postRotate(270f)
+          matrix.postScale(-1f, 1f)
+        }
         else -> {}
       }
       if (matrix.isIdentity) {

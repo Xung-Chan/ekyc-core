@@ -15,20 +15,29 @@ export default function App() {
   const autoCapture = true;
   const isCameraActive = true;
   const phase = 'camera';
-  const facePortraitCameraConfig = {};
+  const facePortraitCameraConfig = {
+    verifyFaceOnStill: true,
+  };
   const onFacePortraitCapture = () => {};
 
   return (
     <View style={styles.container}>
-      <Button title="Start Ekyc" onPress={() => {}} />
-      <FacePortraitCameraView
-        ref={cameraRef}
-        style={fullBleedStyle}
-        autoCapture={autoCapture}
-        isActive={isCameraActive && phase === 'camera'}
-        showFaceDetectionBox={false}
-        config={facePortraitCameraConfig}
-        onFacePortraitCapture={onFacePortraitCapture}
+      <View style={styles.cameraContainer}>
+        <FacePortraitCameraView
+          ref={cameraRef}
+          style={fullBleedStyle}
+          autoCapture={autoCapture}
+          isActive={isCameraActive && phase === 'camera'}
+          showFaceDetectionBox={false}
+          config={facePortraitCameraConfig}
+          onFacePortraitCapture={onFacePortraitCapture}
+        />
+      </View>
+      <Button
+        title="Start Ekyc"
+        onPress={() => {
+          cameraRef.current?.takePhoto();
+        }}
       />
     </View>
   );
@@ -39,5 +48,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 50,
+  },
+  cameraContainer: {
+    flex: 1,
+    flexDirection: 'row',
   },
 });

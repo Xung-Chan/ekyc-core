@@ -230,9 +230,17 @@ export const FacePortraitCameraView = forwardRef<
       setStoppedAfterCapture(false);
     }, []);
 
-    const detectionState = useMemo(() => ({
-      faceRectView: null as { x: number; y: number; width: number; height: number } | null,
-    }), []);
+    const detectionState = useMemo(
+      () => ({
+        faceRectView: null as {
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+        } | null,
+      }),
+      []
+    );
 
     const guideStyle = useMemo((): ViewStyle => {
       const wFrac =
@@ -280,6 +288,7 @@ export const FacePortraitCameraView = forwardRef<
     ]);
 
     const takePhoto = useCallback(async (): Promise<string | null> => {
+      console.log('takePhoto');
       if (!cameraRef.current || busy || stoppedAfterCapture) {
         return null;
       }
@@ -308,13 +317,7 @@ export const FacePortraitCameraView = forwardRef<
         captureLockRef.current = false;
         setBusy(false);
       }
-    }, [
-      busy,
-      emitCapture,
-      onPhotoCaptured,
-      runFinalize,
-      stoppedAfterCapture,
-    ]);
+    }, [busy, emitCapture, onPhotoCaptured, runFinalize, stoppedAfterCapture]);
 
     const startSession = useCallback(() => {
       setStoppedAfterCapture(false);
@@ -385,11 +388,16 @@ export const FacePortraitCameraView = forwardRef<
               style={[
                 styles.faceDetectionBox,
                 {
-                  left: (detectionState.faceRectView as any).x * previewSize.width,
-                  top: (detectionState.faceRectView as any).y * previewSize.height,
-                  width: (detectionState.faceRectView as any).width * previewSize.width,
+                  left:
+                    (detectionState.faceRectView as any).x * previewSize.width,
+                  top:
+                    (detectionState.faceRectView as any).y * previewSize.height,
+                  width:
+                    (detectionState.faceRectView as any).width *
+                    previewSize.width,
                   height:
-                    (detectionState.faceRectView as any).height * previewSize.height,
+                    (detectionState.faceRectView as any).height *
+                    previewSize.height,
                 },
               ]}
             />

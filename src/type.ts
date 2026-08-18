@@ -1,4 +1,4 @@
-import type { ViewStyle } from "react-native";
+import type { ViewStyle } from 'react-native';
 
 /**
  * Cấu hình gần với card scan: auto, khung hướng dẫn, tỷ lệ khớp (fill), số frame ổn định, crop.
@@ -61,10 +61,7 @@ export type FacePortraitCameraConfig = {
   eyeOpenLandmarkRatioMin?: number;
 };
 
-
-
-
-export interface FacePortraitCameraViewRef  {
+export interface FacePortraitCameraViewRef {
   takePhoto: () => Promise<string | null>;
   /**
    * Sau khi chụp + finalize thành công, camera tự tắt session. Gọi `start()` để bật lại preview
@@ -73,7 +70,7 @@ export interface FacePortraitCameraViewRef  {
   start: () => void;
   /** Giống `start()`: bật lại camera nếu đã dừng và reset pipeline detect. */
   reset: () => void;
-};
+}
 
 export type FacePortraitGuideFrameConfig = {
   widthFraction?: number;
