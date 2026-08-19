@@ -15,7 +15,6 @@ import {
   StyleSheet,
   Text,
   View,
-  type ViewStyle,
 } from 'react-native';
 import {
   Camera,
@@ -76,7 +75,7 @@ function normalizeFileUrl(p: string): string {
   return t.startsWith('file://') ? t : `file://${t}`;
 }
 
-export const FacePortraitCameraView = forwardRef<
+const FacePortraitCameraInner = forwardRef<
   FacePortraitCameraViewRef,
   FacePortraitCameraViewProps
 >(
@@ -102,54 +101,6 @@ export const FacePortraitCameraView = forwardRef<
       { videoResolution: 'max' },
       { fps: targetFps },
     ]);
-    const { hasPermission, requestPermission } = useCameraPermission();
-
-    const openCameraPermissionSettings = useCallback(async () => {
-      try {
-        await Linking.openSettings();
-      } catch {
-        // no-op — host may block deep link to settings
-      }
-    }, []);
-
-    /** Xin quyền camera; nếu đã / vừa bị denied hoặc restricted → mở Cài đặt. */
-    const handleRequestCameraPermission = useCallback(async () => {
-      const before = Camera.getCameraPermissionStatus();
-      if (before === 'denied' || before === 'restricted') {
-        await openCameraPermissionSettings();
-        return;
-      }
-
-      const granted = await requestPermission();
-      if (granted) {
-        return;
-      }
-
-      const after = Camera.getCameraPermissionStatus();
-      if (after === 'denied' || after === 'restricted') {
-        await openCameraPermissionSettings();
-      }
-    }, [openCameraPermissionSettings, requestPermission]);
-
-    const didAutoRequestCameraPermissionRef = useRef(false);
-
-    /** Lần đầu vào màn (chưa hỏi quyền) — hiện dialog hệ thống; không auto-xin khi denied/restricted. */
-    useEffect(() => {
-      if (
-        !isActive ||
-        hasPermission ||
-        didAutoRequestCameraPermissionRef.current
-      ) {
-        return;
-      }
-      if (Camera.getCameraPermissionStatus() !== 'not-determined') {
-        return;
-      }
-      didAutoRequestCameraPermissionRef.current = true;
-      requestPermission().catch(() => {
-        // no-op
-      });
-    }, [hasPermission, isActive, requestPermission]);
 
     const cameraRef = useRef<Camera>(null);
     const [busy, setBusy] = useState(false);
@@ -209,7 +160,7 @@ export const FacePortraitCameraView = forwardRef<
         } catch (e) {
           return {
             success: false,
-            error: e instanceof Error ? e.message : String(e),
+            error: e instanceof Error ? e.message : String(e ?? 'unknown'),
           };
         }
       },
@@ -226,85 +177,60 @@ export const FacePortraitCameraView = forwardRef<
       // no-op
     }, []);
 
+    const guideStyle = useMemo(() => {
+      const wFrac = nativeConfig.guideWidthFraction!;
+      const aspect = nativeConfig.guideAspectRatio!;
+      const cyFrac = nativeConfig.guideCenterYFraction!;
+      const w = SCREEN.width * wFrac;
+      const h = w / aspect;
+      const top = SCREEN.height * cyFrac - h / 2;
+      return {
+        position: 'absolute' as const,
+        left: (SCREEN.width - w) / 2,
+        top,
+        width: w,
+        height: h,
+        borderWidth: 2,
+        borderColor: '#fff',
+        borderStyle: 'dashed' as const,
+        borderRadius: h / 2,
+      };
+    }, [nativeConfig]);
+
+    const [detectionState, setDetectionState] = useState({
+      faceRectView: null,
+      eyesOpen: null,
+      luma: null,
+    });
+
     const reset = useCallback(() => {
-      setStoppedAfterCapture(false);
+      setDetectionState({
+        faceRectView: null,
+        eyesOpen: null,
+        luma: null,
+      });
     }, []);
 
-    const detectionState = useMemo(
-      () => ({
-        faceRectView: null as {
-          x: number;
-          y: number;
-          width: number;
-          height: number;
-        } | null,
-      }),
-      []
-    );
-
-    const guideStyle = useMemo((): ViewStyle => {
-      const wFrac =
-        guideCfg.widthFraction ??
-        userConfig.guideWidthFraction ??
-        CONFIG_BASE.guideWidthFraction;
-      const aspect =
-        guideCfg.aspectRatio ??
-        userConfig.guideAspectRatio ??
-        CONFIG_BASE.guideAspectRatio;
-      const centerY =
-        guideCfg.centerYFraction ??
-        userConfig.guideCenterYFraction ??
-        CONFIG_BASE.guideCenterYFraction;
-
-      if (previewSize.width <= 0 || previewSize.height <= 0) {
-        return {
-          position: 'absolute',
-          left: (SCREEN.width * (1 - wFrac)) / 2,
-          top: 120,
-          width: SCREEN.width * wFrac,
-          height: (SCREEN.width * wFrac) / aspect,
-          opacity: 0,
-        };
-      }
-
-      const gw = previewSize.width * wFrac;
-      const gh = gw / aspect;
-      return {
-        position: 'absolute',
-        left: (previewSize.width - gw) / 2,
-        top: previewSize.height * centerY - gh / 2,
-        width: gw,
-        height: gh,
-      };
-    }, [
-      guideCfg.aspectRatio,
-      guideCfg.centerYFraction,
-      guideCfg.widthFraction,
-      previewSize.height,
-      previewSize.width,
-      userConfig.guideAspectRatio,
-      userConfig.guideCenterYFraction,
-      userConfig.guideWidthFraction,
-    ]);
-
     const takePhoto = useCallback(async (): Promise<string | null> => {
-      console.log('takePhoto');
-      if (!cameraRef.current || busy || stoppedAfterCapture) {
+      if (
+        !cameraRef.current ||
+        busy ||
+        stoppedAfterCapture ||
+        captureLockRef.current
+      ) {
         return null;
       }
       captureLockRef.current = true;
       setBusy(true);
       try {
         const photo = await cameraRef.current.takePhoto({ flash: 'off' });
-        const path = photo.path.startsWith('file://')
-          ? photo.path
-          : `file://${photo.path}`;
-        const ev = await runFinalize(path);
-        await emitCapture(ev);
-        if (ev.success) {
-          setStoppedAfterCapture(true);
+        const path = photo.path;
+        setStoppedAfterCapture(true);
+        const result = await runFinalize(path);
+        await emitCapture(result);
+        if (result.success) {
+          onPhotoCaptured?.(result.faceCropPath || path);
         }
-        await onPhotoCaptured?.(path);
         return path;
       } catch (e) {
         await emitCapture({
@@ -334,22 +260,6 @@ export const FacePortraitCameraView = forwardRef<
       }),
       [startSession, takePhoto]
     );
-
-    if (!hasPermission) {
-      return (
-        <View style={[styles.permissionPlaceholder, style]}>
-          <Text style={styles.permissionTitle}>Cần quyền camera</Text>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.permissionBtn}
-            onPress={handleRequestCameraPermission}
-          >
-            <Text style={styles.permissionBtnText}>Cấp quyền</Text>
-          </Pressable>
-          {children}
-        </View>
-      );
-    }
 
     if (device == null) {
       return (
@@ -417,10 +327,83 @@ export const FacePortraitCameraView = forwardRef<
   }
 );
 
+// Wrapper component that checks permissions first and only mounts FacePortraitCameraInner when permissions are granted
+export const FacePortraitCameraView = forwardRef<
+  FacePortraitCameraViewRef,
+  FacePortraitCameraViewProps
+>((props, ref) => {
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const didAutoRequestCameraPermissionRef = useRef(false);
+
+  const openCameraPermissionSettings = useCallback(async () => {
+    try {
+      await Linking.openSettings();
+    } catch {
+      // no-op — host may block deep link to settings
+    }
+  }, []);
+
+  /** Xin quyền camera; nếu đã / vừa bị denied hoặc restricted → mở Cài đặt. */
+  const handleRequestCameraPermission = useCallback(async () => {
+    const before = Camera.getCameraPermissionStatus();
+    if (before === 'denied' || before === 'restricted') {
+      await openCameraPermissionSettings();
+      return;
+    }
+
+    const granted = await requestPermission();
+    if (granted) {
+      return;
+    }
+
+    const after = Camera.getCameraPermissionStatus();
+    if (after === 'denied' || after === 'restricted') {
+      await openCameraPermissionSettings();
+    }
+  }, [openCameraPermissionSettings, requestPermission]);
+
+  /** Lần đầu vào màn (chưa hỏi quyền) — hiện dialog hệ thống; không auto-xin khi denied/restricted. */
+  useEffect(() => {
+    if (
+      !props.isActive ||
+      hasPermission ||
+      didAutoRequestCameraPermissionRef.current
+    ) {
+      return;
+    }
+    if (Camera.getCameraPermissionStatus() !== 'not-determined') {
+      return;
+    }
+    didAutoRequestCameraPermissionRef.current = true;
+    requestPermission().catch(() => {
+      // no-op
+    });
+  }, [hasPermission, props.isActive, requestPermission]);
+
+  if (!hasPermission) {
+    return (
+      <View style={[styles.permissionPlaceholder, props.style]}>
+        <Text style={styles.permissionTitle}>Cần quyền camera</Text>
+        <Pressable
+          accessibilityRole="button"
+          style={styles.permissionBtn}
+          onPress={handleRequestCameraPermission}
+        >
+          <Text style={styles.permissionBtnText}>Cấp quyền</Text>
+        </Pressable>
+        {props.children}
+      </View>
+    );
+  }
+
+  // Once permission is granted, mount the camera inner component
+  return <FacePortraitCameraInner ref={ref} {...props} />;
+});
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#005',
   },
   preview: {
     flex: 1,

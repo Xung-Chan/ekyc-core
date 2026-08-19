@@ -11,7 +11,6 @@ import React, {
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   Linking,
   Pressable,
   StyleSheet,
@@ -148,6 +147,7 @@ export type CardScannerCameraViewProps = {
   style?: ViewStyle;
   children?: React.ReactNode;
   showGuide?: boolean;
+  onRetry?: () => void;
 };
 
 export type CardScannerCameraViewRef = {
@@ -157,7 +157,9 @@ export type CardScannerCameraViewRef = {
   reset: () => void;
 };
 
-export const CardScannerCameraView = forwardRef<
+// Child component that actually accesses the camera and calls useCameraDevice.
+// Separated so hook execution only starts when camera permissions are already granted.
+const CardScannerCameraInner = forwardRef<
   CardScannerCameraViewRef,
   CardScannerCameraViewProps
 >(
@@ -171,6 +173,7 @@ export const CardScannerCameraView = forwardRef<
       style,
       children,
       showGuide = true,
+      onRetry,
     },
     ref
   ) => {
@@ -181,16 +184,9 @@ export const CardScannerCameraView = forwardRef<
       { videoAspectRatio: SCREEN.height / SCREEN.width },
       { photoAspectRatio: SCREEN.height / SCREEN.width },
     ]);
-    const { hasPermission, requestPermission } = useCameraPermission();
     const cameraRef = useRef<Camera>(null);
     const [busy, setBusy] = useState(false);
-    const [stoppedAfterCapture, setStoppedAfterCapture] = useState(false);
-    const [capturedImagePath, setCapturedImagePath] = useState<string | null>(
-      null
-    );
     const captureLockRef = useRef(false);
-
-    const effectiveIsActive = isActive && !stoppedAfterCapture;
 
     const [previewSize, setPreviewSize] = useState({
       width: SCREEN.width,
@@ -201,48 +197,6 @@ export const CardScannerCameraView = forwardRef<
       const { width, height } = e.nativeEvent.layout;
       setPreviewSize({ width, height });
     }, []);
-
-    const openCameraPermissionSettings = useCallback(async () => {
-      try {
-        await Linking.openSettings();
-      } catch {
-        // no-op
-      }
-    }, []);
-
-    const handleRequestCameraPermission = useCallback(async () => {
-      const before = Camera.getCameraPermissionStatus();
-      if (before === 'denied' || before === 'restricted') {
-        await openCameraPermissionSettings();
-        return;
-      }
-      const granted = await requestPermission();
-      if (!granted) {
-        const after = Camera.getCameraPermissionStatus();
-        if (after === 'denied' || after === 'restricted') {
-          await openCameraPermissionSettings();
-        }
-      }
-    }, [openCameraPermissionSettings, requestPermission]);
-
-    const didAutoRequestCameraPermissionRef = useRef(false);
-
-    useEffect(() => {
-      if (
-        !isActive ||
-        hasPermission ||
-        didAutoRequestCameraPermissionRef.current
-      ) {
-        return;
-      }
-      if (Camera.getCameraPermissionStatus() !== 'not-determined') {
-        return;
-      }
-      didAutoRequestCameraPermissionRef.current = true;
-      requestPermission().catch(() => {
-        // no-op
-      });
-    }, [hasPermission, isActive, requestPermission]);
 
     const overlayGuide = useMemo(
       () =>
@@ -319,12 +273,7 @@ export const CardScannerCameraView = forwardRef<
     }, [figmaGuideOverlayGeom]);
 
     const takePhoto = useCallback(async (): Promise<string | null> => {
-      if (
-        !cameraRef.current ||
-        busy ||
-        stoppedAfterCapture ||
-        captureLockRef.current
-      ) {
+      if (!cameraRef.current || busy || captureLockRef.current) {
         return null;
       }
       captureLockRef.current = true;
@@ -360,11 +309,8 @@ export const CardScannerCameraView = forwardRef<
         );
         const returnedPath = cropResult.croppedImagePath || path;
 
+        // Callback is invoked; no local preview image state is set in the SDK component
         await onPhotoCaptured?.(returnedPath, scanResult);
-        if (cropResult.success) {
-          setCapturedImagePath(returnedPath);
-          setStoppedAfterCapture(true);
-        }
         return returnedPath;
       } catch (e) {
         console.error(
@@ -376,29 +322,20 @@ export const CardScannerCameraView = forwardRef<
         captureLockRef.current = false;
         setBusy(false);
       }
-    }, [
-      busy,
-      stoppedAfterCapture,
-      previewSize,
-      overlayGuide,
-      expectedSide,
-      onPhotoCaptured,
-    ]);
+    }, [busy, previewSize, overlayGuide, expectedSide, onPhotoCaptured]);
 
     const stop = useCallback(() => {
-      setStoppedAfterCapture(true);
+      // No-op (camera preview handled by app lifecycle/isActive prop)
     }, []);
 
     const start = useCallback(() => {
-      setCapturedImagePath(null);
-      setStoppedAfterCapture(false);
       captureLockRef.current = false;
+      setBusy(false);
     }, []);
 
     const reset = useCallback(() => {
-      setCapturedImagePath(null);
-      setStoppedAfterCapture(false);
       captureLockRef.current = false;
+      setBusy(false);
     }, []);
 
     useImperativeHandle(
@@ -412,26 +349,19 @@ export const CardScannerCameraView = forwardRef<
       [takePhoto, stop, start, reset]
     );
 
-    if (!hasPermission) {
-      return (
-        <View style={[styles.permissionPlaceholder, style]}>
-          <Text style={styles.permissionTitle}>Cần quyền camera</Text>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.permissionBtn}
-            onPress={handleRequestCameraPermission}
-          >
-            <Text style={styles.permissionBtnText}>Cấp quyền</Text>
-          </Pressable>
-          {children}
-        </View>
-      );
-    }
-
     if (device == null) {
       return (
         <View style={[styles.permissionPlaceholder, style]}>
           <Text style={styles.permissionTitle}>Không tìm thấy camera.</Text>
+          {onRetry && (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.permissionBtn}
+              onPress={onRetry}
+            >
+              <Text style={styles.permissionBtnText}>Thử lại</Text>
+            </Pressable>
+          )}
           {children}
         </View>
       );
@@ -440,94 +370,83 @@ export const CardScannerCameraView = forwardRef<
     return (
       <View style={[styles.root, style]}>
         <View style={styles.preview} onLayout={onPreviewLayout}>
-          {capturedImagePath ? (
-            <Image
-              source={{ uri: capturedImagePath }}
-              style={StyleSheet.absoluteFill}
-              resizeMode="contain"
-            />
-          ) : (
-            <Camera
-              ref={cameraRef}
-              style={StyleSheet.absoluteFill}
-              device={device}
-              format={format}
-              isActive={effectiveIsActive}
-              outputOrientation="preview"
-              photo
-              fps={targetFps}
-              resizeMode="cover"
-              enableZoomGesture={false}
-            />
-          )}
+          <Camera
+            ref={cameraRef}
+            style={StyleSheet.absoluteFill}
+            device={device}
+            format={format}
+            isActive={isActive}
+            outputOrientation="preview"
+            photo
+            fps={targetFps}
+            resizeMode="cover"
+            enableZoomGesture={false}
+          />
 
-          {!capturedImagePath &&
-            showGuide &&
-            figmaGuideOverlayGeom &&
-            figmaBracketPaths && (
-              <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                <Svg
+          {showGuide && figmaGuideOverlayGeom && figmaBracketPaths && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Svg
+                width={previewSize.width}
+                height={previewSize.height}
+                style={StyleSheet.absoluteFill}
+              >
+                <Defs>
+                  <Mask id={holeMaskId}>
+                    <SvgRect
+                      x={0}
+                      y={0}
+                      width={previewSize.width}
+                      height={previewSize.height}
+                      fill="#ffffff"
+                    />
+                    <SvgRect
+                      x={figmaGuideOverlayGeom.hx}
+                      y={figmaGuideOverlayGeom.hy}
+                      width={figmaGuideOverlayGeom.gw}
+                      height={figmaGuideOverlayGeom.gh}
+                      rx={figmaGuideOverlayGeom.rx}
+                      ry={figmaGuideOverlayGeom.rx}
+                      fill="#000000"
+                    />
+                  </Mask>
+                </Defs>
+
+                <SvgRect
+                  x={0}
+                  y={0}
                   width={previewSize.width}
                   height={previewSize.height}
-                  style={StyleSheet.absoluteFill}
-                >
-                  <Defs>
-                    <Mask id={holeMaskId}>
-                      <SvgRect
-                        x={0}
-                        y={0}
-                        width={previewSize.width}
-                        height={previewSize.height}
-                        fill="#ffffff"
-                      />
-                      <SvgRect
-                        x={figmaGuideOverlayGeom.hx}
-                        y={figmaGuideOverlayGeom.hy}
-                        width={figmaGuideOverlayGeom.gw}
-                        height={figmaGuideOverlayGeom.gh}
-                        rx={figmaGuideOverlayGeom.rx}
-                        ry={figmaGuideOverlayGeom.rx}
-                        fill="#000000"
-                      />
-                    </Mask>
-                  </Defs>
+                  fill="rgba(0, 0, 0, 0.65)"
+                  mask={`url(#${holeMaskId})`}
+                />
 
-                  <SvgRect
-                    x={0}
-                    y={0}
-                    width={previewSize.width}
-                    height={previewSize.height}
-                    fill="rgba(0, 0, 0, 0.65)"
-                    mask={`url(#${holeMaskId})`}
-                  />
-
-                  <Path
-                    d={figmaBracketPaths.tl}
-                    stroke="#ffffff"
-                    strokeWidth={3}
-                    fill="none"
-                  />
-                  <Path
-                    d={figmaBracketPaths.tr}
-                    stroke="#ffffff"
-                    strokeWidth={3}
-                    fill="none"
-                  />
-                  <Path
-                    d={figmaBracketPaths.bl}
-                    stroke="#ffffff"
-                    strokeWidth={3}
-                    fill="none"
-                  />
-                  <Path
-                    d={figmaBracketPaths.br}
-                    stroke="#ffffff"
-                    strokeWidth={3}
-                    fill="none"
-                  />
-                </Svg>
-              </View>
-            )}
+                <Path
+                  d={figmaBracketPaths.tl}
+                  stroke="#ffffff"
+                  strokeWidth={3}
+                  fill="none"
+                />
+                <Path
+                  d={figmaBracketPaths.tr}
+                  stroke="#ffffff"
+                  strokeWidth={3}
+                  fill="none"
+                />
+                <Path
+                  d={figmaBracketPaths.bl}
+                  stroke="#ffffff"
+                  strokeWidth={3}
+                  fill="none"
+                />
+                <Path
+                  d={figmaBracketPaths.br}
+                  stroke="#ffffff"
+                  strokeWidth={3}
+                  fill="none"
+                />
+              </Svg>
+            </View>
+          )}
 
           {busy && (
             <View style={styles.busyOverlay}>
@@ -541,6 +460,86 @@ export const CardScannerCameraView = forwardRef<
     );
   }
 );
+
+// Wrapper component that checks permissions first and only mounts CardScannerCameraInner when permissions are granted
+export const CardScannerCameraView = forwardRef<
+  CardScannerCameraViewRef,
+  CardScannerCameraViewProps
+>((props, ref) => {
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const didAutoRequestCameraPermissionRef = useRef(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRetry = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  const openCameraPermissionSettings = useCallback(async () => {
+    try {
+      await Linking.openSettings();
+    } catch {
+      // no-op
+    }
+  }, []);
+
+  const handleRequestCameraPermission = useCallback(async () => {
+    const before = Camera.getCameraPermissionStatus();
+    if (before === 'denied' || before === 'restricted') {
+      await openCameraPermissionSettings();
+      return;
+    }
+    const granted = await requestPermission();
+    if (!granted) {
+      const after = Camera.getCameraPermissionStatus();
+      if (after === 'denied' || after === 'restricted') {
+        await openCameraPermissionSettings();
+      }
+    }
+  }, [openCameraPermissionSettings, requestPermission]);
+
+  useEffect(() => {
+    if (
+      !props.isActive ||
+      hasPermission ||
+      didAutoRequestCameraPermissionRef.current
+    ) {
+      return;
+    }
+    if (Camera.getCameraPermissionStatus() !== 'not-determined') {
+      return;
+    }
+    didAutoRequestCameraPermissionRef.current = true;
+    requestPermission().catch(() => {
+      // no-op
+    });
+  }, [hasPermission, props.isActive, requestPermission]);
+
+  if (!hasPermission) {
+    return (
+      <View style={[styles.permissionPlaceholder, props.style]}>
+        <Text style={styles.permissionTitle}>Cần quyền camera</Text>
+        <Pressable
+          accessibilityRole="button"
+          style={styles.permissionBtn}
+          onPress={handleRequestCameraPermission}
+        >
+          <Text style={styles.permissionBtnText}>Cấp quyền</Text>
+        </Pressable>
+        {props.children}
+      </View>
+    );
+  }
+
+  // Once permission is granted, mount the camera inner component with key to allow remounting
+  return (
+    <CardScannerCameraInner
+      ref={ref}
+      key={refreshKey}
+      onRetry={handleRetry}
+      {...props}
+    />
+  );
+});
 
 const styles = StyleSheet.create({
   root: {
