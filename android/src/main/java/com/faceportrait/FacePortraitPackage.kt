@@ -8,10 +8,10 @@ import com.facebook.react.module.model.ReactModuleInfoProvider
 
 class FacePortraitPackage : BaseReactPackage() {
   override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
-    return if (name == FacePortraitModule.NAME) {
-      FacePortraitModule(reactContext)
-    } else {
-      null
+    return when (name) {
+      FacePortraitModule.NAME -> FacePortraitModule(reactContext)
+      CardScannerModule.NAME -> CardScannerModule(reactContext)
+      else -> null
     }
   }
 
@@ -20,6 +20,14 @@ class FacePortraitPackage : BaseReactPackage() {
       FacePortraitModule.NAME to ReactModuleInfo(
         name = FacePortraitModule.NAME,
         className = FacePortraitModule.NAME,
+        canOverrideExistingModule = false,
+        needsEagerInit = false,
+        isCxxModule = false,
+        isTurboModule = true
+      ),
+      CardScannerModule.NAME to ReactModuleInfo(
+        name = CardScannerModule.NAME,
+        className = CardScannerModule.NAME,
         canOverrideExistingModule = false,
         needsEagerInit = false,
         isCxxModule = false,
