@@ -1,2 +1,9 @@
-export { startEkyc, getResult } from './ekycCore';
-export * from './types/ekyc-type';
+export { finalizeFromPath } from './modules/facePortrait';
+export {
+  cropCardImageOnly,
+  deleteLocalImages,
+  scrubCardScannerTempFiles,
+} from './modules/cardScanner';
+export * from './components';
+export * from './type';
+export * from './modules/photoGuideCropRect';

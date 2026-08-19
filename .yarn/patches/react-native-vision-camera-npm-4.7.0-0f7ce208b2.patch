@@ -1,0 +1,26 @@
+diff --git a/android/src/main/java/com/mrousavy/camera/react/CameraViewManager.kt b/android/src/main/java/com/mrousavy/camera/react/CameraViewManager.kt
+index c5845b727fe3a65840c522c7b0ea6f3245f010c1..4b613ca7f7458381ef448572b88542ba1677d174 100644
+--- a/android/src/main/java/com/mrousavy/camera/react/CameraViewManager.kt
++++ b/android/src/main/java/com/mrousavy/camera/react/CameraViewManager.kt
+@@ -41,7 +41,7 @@ class CameraViewManager : ViewGroupManager<CameraView>() {
+       .put(CameraOutputOrientationChangedEvent.EVENT_NAME, MapBuilder.of("registrationName", "onOutputOrientationChanged"))
+       .put(CameraPreviewOrientationChangedEvent.EVENT_NAME, MapBuilder.of("registrationName", "onPreviewOrientationChanged"))
+       .put(AverageFpsChangedEvent.EVENT_NAME, MapBuilder.of("registrationName", "onAverageFpsChanged"))
+-      .build()
++      .build().toMutableMap()
+ 
+   override fun getName(): String = TAG
+ 
+diff --git a/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt b/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt
+index 7ae420949dd68c7e3ad37e64f2bffcc0b71fe897..059f677a4484f8f2a486396ad86855aecc8f769e 100644
+--- a/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt
++++ b/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt
+@@ -189,7 +189,7 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
+   }
+ 
+   private fun canRequestPermission(permission: String): Boolean {
+-    val activity = currentActivity as? PermissionAwareActivity
++    val activity = reactApplicationContext.currentActivity as? PermissionAwareActivity
+     return activity?.shouldShowRequestPermissionRationale(permission) ?: false
+   }
+ 

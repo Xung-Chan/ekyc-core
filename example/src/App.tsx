@@ -1,14 +1,10 @@
-import { startEkyc } from '@xungchan/ekyc-core';
-import { Button, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import AppNavigator from './navagation/AppNavigator';
 
 export default function App() {
-  const handlePress = async () => {
-    const result = await startEkyc();
-    console.log(result);
-  };
   return (
     <View style={styles.container}>
-      <Button title="Start Ekyc" onPress={handlePress} />
+      <AppNavigator />
     </View>
   );
 }
@@ -16,7 +12,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#000000',
   },
 });
