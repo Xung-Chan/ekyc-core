@@ -2136,43 +2136,43 @@ __metadata:
   linkType: hard
 
 "@inquirer/checkbox@npm:^5.1.4":
-  version: 5.2.1
-  resolution: "@inquirer/checkbox@npm:5.2.1"
+  version: 5.2.2
+  resolution: "@inquirer/checkbox@npm:5.2.2"
   dependencies:
     "@inquirer/ansi": "npm:^2.0.7"
-    "@inquirer/core": "npm:^11.2.1"
-    "@inquirer/figures": "npm:^2.0.7"
+    "@inquirer/core": "npm:^12.0.0"
+    "@inquirer/figures": "npm:^2.0.8"
     "@inquirer/type": "npm:^4.0.7"
   peerDependencies:
     "@types/node": ">=18"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/e3a845156c718fbbec228a0e7fd2a4f10775185615eac1f405b3a2bb2ae607dda6baf178fbd6487db0e12e5e33014536e81acefe65de57cd476a7aeaea6fb35d
+  checksum: 10c0/b71cc4e06a69e3a4bcc3ebbd29476d9ea205299837e8677939135eda59ec9fd9eb8d2250741a6d5060754d75b7003f74d26f44172618b55f0c731b0a5ebe1a54
   languageName: node
   linkType: hard
 
 "@inquirer/confirm@npm:^6.0.12":
-  version: 6.1.1
-  resolution: "@inquirer/confirm@npm:6.1.1"
+  version: 6.2.0
+  resolution: "@inquirer/confirm@npm:6.2.0"
   dependencies:
-    "@inquirer/core": "npm:^11.2.1"
+    "@inquirer/core": "npm:^12.0.0"
     "@inquirer/type": "npm:^4.0.7"
   peerDependencies:
     "@types/node": ">=18"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/4684406161c09327df830b4026f3165b31e13831276d215051586408ed434423263b15686393ce95a4b55058c1b7f9b08aa4b66f5ac930b47523fff75051d36f
+  checksum: 10c0/dd673ce6db0e0e7ae96c5a4520ae24cb2e10f33e2347bdc99805aaaccd310c05a338c87f56d350a290ca60d9c65bbd1db8fd500e432ab6074d39140cafc793d6
   languageName: node
   linkType: hard
 
-"@inquirer/core@npm:^11.2.1":
-  version: 11.2.1
-  resolution: "@inquirer/core@npm:11.2.1"
+"@inquirer/core@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "@inquirer/core@npm:12.0.0"
   dependencies:
     "@inquirer/ansi": "npm:^2.0.7"
-    "@inquirer/figures": "npm:^2.0.7"
+    "@inquirer/figures": "npm:^2.0.8"
     "@inquirer/type": "npm:^4.0.7"
     cli-width: "npm:^4.1.0"
     fast-wrap-ansi: "npm:^0.2.0"
@@ -2183,44 +2183,44 @@ __metadata:
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/b5be386cecd9e441ac2f9d3417a6ae1c4658b3ee6cdf5dae791211400f4de158851f81fca2245e2062833716f95366b9e1717770828cb7365e756c16e822f0d2
+  checksum: 10c0/070f1978e5f306f5e7588c1096ac11481276635233f6f683dd1fa0e2236faf26a00709a09aa37af9479c3bd94645e73d8000cf6834527883a5bc7007832fd5ad
   languageName: node
   linkType: hard
 
 "@inquirer/editor@npm:^5.1.1":
-  version: 5.2.2
-  resolution: "@inquirer/editor@npm:5.2.2"
+  version: 5.3.0
+  resolution: "@inquirer/editor@npm:5.3.0"
   dependencies:
-    "@inquirer/core": "npm:^11.2.1"
-    "@inquirer/external-editor": "npm:^3.0.3"
+    "@inquirer/core": "npm:^12.0.0"
+    "@inquirer/external-editor": "npm:^3.0.4"
     "@inquirer/type": "npm:^4.0.7"
   peerDependencies:
     "@types/node": ">=18"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/a75e7012aad3ccc3ec84893463ed689924515a6cbaee8e2a475769fb27c12bcf359fcdd5f62e92107fc4be88fd69444c15adf13071982efc140c7015a6604d9a
+  checksum: 10c0/151b1e0c4405d94d7d8e16618ba39de6e32efee563f99eb6c4c2225901467a211230327baad9c0940fae4a3c1e7f443908bf0849e509fbe5cd288f939d62d9f2
   languageName: node
   linkType: hard
 
 "@inquirer/expand@npm:^5.0.13":
-  version: 5.1.1
-  resolution: "@inquirer/expand@npm:5.1.1"
+  version: 5.1.2
+  resolution: "@inquirer/expand@npm:5.1.2"
   dependencies:
-    "@inquirer/core": "npm:^11.2.1"
+    "@inquirer/core": "npm:^12.0.0"
     "@inquirer/type": "npm:^4.0.7"
   peerDependencies:
     "@types/node": ">=18"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/4de661a042147759ce351971a4f92010ab66cb76450424e7d8aec5de79b449d14e8751f54f557d0b047180bca2b76707626f4835ee46603c6200139c31b59652
+  checksum: 10c0/3ca2cd5e42802b0c7daad15c2d44c16ef04fffb6f434e676185afba9868aa561930c5a19032cae0066abfe7820949ed2776ca4d8bf03519009ef2cc7472db900
   languageName: node
   linkType: hard
 
-"@inquirer/external-editor@npm:^3.0.3":
-  version: 3.0.3
-  resolution: "@inquirer/external-editor@npm:3.0.3"
+"@inquirer/external-editor@npm:^3.0.4":
+  version: 3.0.4
+  resolution: "@inquirer/external-editor@npm:3.0.4"
   dependencies:
     chardet: "npm:^2.1.1"
     iconv-lite: "npm:^0.7.2"
@@ -2229,60 +2229,60 @@ __metadata:
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/fc24ddbff15f0874db6498c16d2fe153bb19a670d83605f480486d6ff0ea872ae2f32a548fd555797989db09850fa019a6b5e49a8d40cfee0d7deacad17edc1e
+  checksum: 10c0/ec50397f0132aca03e026690466dfb1a63203744926513eb26e0d950004e4c2359bfab24405ea7afa50d3cb1620707b81b1c2751bd5dbee2f8f7d1905be61f05
   languageName: node
   linkType: hard
 
-"@inquirer/figures@npm:^2.0.7":
-  version: 2.0.7
-  resolution: "@inquirer/figures@npm:2.0.7"
-  checksum: 10c0/e0573dc9ad25fa3628d5164745e52852d8cd832a9918605b7716df2e37a0005a0aaf40b6d81cef2ca09cb708b200e61b82d1dcd17003f572577e233c19a9ec7b
+"@inquirer/figures@npm:^2.0.8":
+  version: 2.0.8
+  resolution: "@inquirer/figures@npm:2.0.8"
+  checksum: 10c0/49fd3b196c783c09d64c9f5692f9c26d0740169b99b55c97adc00e0f4e5665ec4097ab9bff40360c29c4b6b348b315b4eaadbab6cdeb5cb8335a8ac44ec62168
   languageName: node
   linkType: hard
 
 "@inquirer/input@npm:^5.0.12":
-  version: 5.1.2
-  resolution: "@inquirer/input@npm:5.1.2"
+  version: 5.1.3
+  resolution: "@inquirer/input@npm:5.1.3"
   dependencies:
-    "@inquirer/core": "npm:^11.2.1"
+    "@inquirer/core": "npm:^12.0.0"
     "@inquirer/type": "npm:^4.0.7"
   peerDependencies:
     "@types/node": ">=18"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/9c3614f8d79fc2bec07a088858a58967a162046c9292b0c6f0c6f63396cf391181cfb54bb636f5b3dce8d23924c24ee4a0310183a493c94190e4750218f3744d
+  checksum: 10c0/0a6d200ca16a0e422a51af4f5a879448850bb2b43bb7e4ae7815cd56c6ca9083ed333dedb7700009f61d3d227bb84e46a6cdd74f7863057b9134a122239acfe9
   languageName: node
   linkType: hard
 
 "@inquirer/number@npm:^4.0.12":
-  version: 4.1.1
-  resolution: "@inquirer/number@npm:4.1.1"
+  version: 4.2.0
+  resolution: "@inquirer/number@npm:4.2.0"
   dependencies:
-    "@inquirer/core": "npm:^11.2.1"
+    "@inquirer/core": "npm:^12.0.0"
     "@inquirer/type": "npm:^4.0.7"
   peerDependencies:
     "@types/node": ">=18"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/06210dd70bf89d35242af43009b5e3f76a5f07d6275a9d842bbed61536032f5f349ecba1c20012975d7b0362deb89746d5903e90f21516da10bfd8c2055829a9
+  checksum: 10c0/ccde39bc940b324874d456b9dbf110e6c9d501a904229ea0f858689224e1d38e6b419932779d15c11b28af35f7b7b955337b1d173348a78bf999602f87eaf68f
   languageName: node
   linkType: hard
 
 "@inquirer/password@npm:^5.0.12":
-  version: 5.1.1
-  resolution: "@inquirer/password@npm:5.1.1"
+  version: 5.1.2
+  resolution: "@inquirer/password@npm:5.1.2"
   dependencies:
     "@inquirer/ansi": "npm:^2.0.7"
-    "@inquirer/core": "npm:^11.2.1"
+    "@inquirer/core": "npm:^12.0.0"
     "@inquirer/type": "npm:^4.0.7"
   peerDependencies:
     "@types/node": ">=18"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/e4cb3a53b56743808f83958a8fe85738d721599690a4bc7640eaa07fb8f4765bc6f174e40c16efcc8a5958a7169667e240714a706a36e831f9c7a6822cbe8b55
+  checksum: 10c0/5b0fc1f7e81e64c9f379c3a303ee317cf237b470dc61e1b54afb29a670bceaf6369d6d0dc4b63471590fc79d82b6e1fdcdb7a4ccfe22117478596f9775302a66
   languageName: node
   linkType: hard
 
@@ -2310,50 +2310,50 @@ __metadata:
   linkType: hard
 
 "@inquirer/rawlist@npm:^5.2.8":
-  version: 5.3.1
-  resolution: "@inquirer/rawlist@npm:5.3.1"
+  version: 5.3.2
+  resolution: "@inquirer/rawlist@npm:5.3.2"
   dependencies:
-    "@inquirer/core": "npm:^11.2.1"
+    "@inquirer/core": "npm:^12.0.0"
     "@inquirer/type": "npm:^4.0.7"
   peerDependencies:
     "@types/node": ">=18"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/a05eb6a16633bd7b32b3b6b2c1f645e6e28d955475b21ba7222e7e66806b1be15be9f91235b2933e8d27e04fdad81ebfb2d64fc1fc0d4b8d82dcd2718817b2b9
+  checksum: 10c0/5ea4af1142e111a49fe92d5d4695fb9eff9a787188a2b349ea0caca1c3ed60683fc0247f9a375148ba14c5d4f36c90f83fa08de8d4ddfd63df9027fd40ef8bf1
   languageName: node
   linkType: hard
 
 "@inquirer/search@npm:^4.1.8":
-  version: 4.2.1
-  resolution: "@inquirer/search@npm:4.2.1"
+  version: 4.3.0
+  resolution: "@inquirer/search@npm:4.3.0"
   dependencies:
-    "@inquirer/core": "npm:^11.2.1"
-    "@inquirer/figures": "npm:^2.0.7"
+    "@inquirer/core": "npm:^12.0.0"
+    "@inquirer/figures": "npm:^2.0.8"
     "@inquirer/type": "npm:^4.0.7"
   peerDependencies:
     "@types/node": ">=18"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/eae9b2d524aae58266f96987696be22ad62f608661d28763c413f2560094d571a39d72a40630d2470f503ad5e6e50d8c574a653cc028bf79b51104fa91f59a67
+  checksum: 10c0/7a5fd304dd2b8ebc1698954997aff5eb0a1e74ce89bb23f87041455d5f5d449c970f49179a477ceca5fe1beb86af919b49aa978c1f50a4145f909575295c9dc1
   languageName: node
   linkType: hard
 
 "@inquirer/select@npm:^5.1.4":
-  version: 5.2.1
-  resolution: "@inquirer/select@npm:5.2.1"
+  version: 5.2.2
+  resolution: "@inquirer/select@npm:5.2.2"
   dependencies:
     "@inquirer/ansi": "npm:^2.0.7"
-    "@inquirer/core": "npm:^11.2.1"
-    "@inquirer/figures": "npm:^2.0.7"
+    "@inquirer/core": "npm:^12.0.0"
+    "@inquirer/figures": "npm:^2.0.8"
     "@inquirer/type": "npm:^4.0.7"
   peerDependencies:
     "@types/node": ">=18"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10c0/3c6d0151b5a29111254a58eaf8b93bb4c476e68b0751526d8bff61a4bea457bdbe782890ae33977c5d2015f436596b5d32a8bb0677bfdf610f5f5998e65f5a92
+  checksum: 10c0/deffe20aed1953533c2cbc6ea66972524da0d01ffef49b39de4a083011d6b931c21b8f0c8d3a8e4e37e2d196fbfc4afe9b3dc51315708cb7687d2d79f7027d86
   languageName: node
   linkType: hard
 
@@ -3335,9 +3335,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-navigation/core@npm:^7.21.12":
-  version: 7.21.12
-  resolution: "@react-navigation/core@npm:7.21.12"
+"@react-navigation/core@npm:^7.21.13":
+  version: 7.21.13
+  resolution: "@react-navigation/core@npm:7.21.13"
   dependencies:
     "@react-navigation/routers": "npm:^7.6.4"
     escape-string-regexp: "npm:^4.0.0"
@@ -3349,53 +3349,53 @@ __metadata:
     use-sync-external-store: "npm:^1.5.0"
   peerDependencies:
     react: ">= 18.2.0"
-  checksum: 10c0/2e05ff5f251f64e172fccc2d80e7c76b6249c8fe0198f3013045c27c76bac1813b1c676d659df8002673e196a8d4f9d91ab8af5df76873c55494e45a033dcc98
+  checksum: 10c0/e065d05bea1adaef898db2f99fd7d92992bcbfb6d062a0f98b905bc924c83d2bd569453d59088a7c7b87aa77b07eb47be33dbe4974497aeeb5d7d0b44d9244a3
   languageName: node
   linkType: hard
 
-"@react-navigation/elements@npm:^2.9.38":
-  version: 2.9.38
-  resolution: "@react-navigation/elements@npm:2.9.38"
+"@react-navigation/elements@npm:^2.9.39":
+  version: 2.9.39
+  resolution: "@react-navigation/elements@npm:2.9.39"
   dependencies:
     color: "npm:^4.2.3"
     use-latest-callback: "npm:^0.2.4"
     use-sync-external-store: "npm:^1.5.0"
   peerDependencies:
     "@react-native-masked-view/masked-view": ">= 0.2.0"
-    "@react-navigation/native": ^7.3.16
+    "@react-navigation/native": ^7.3.17
     react: ">= 18.2.0"
     react-native: "*"
     react-native-safe-area-context: ">= 4.0.0"
   peerDependenciesMeta:
     "@react-native-masked-view/masked-view":
       optional: true
-  checksum: 10c0/8aad1be751f0d4071205ce905f8e6794d9467cae83f4102a622949ec43b79d367825cfe81da20294d5c1a707d91b8128eed8b6b320a4ad93c88db28fbeb5e560
+  checksum: 10c0/92b8a0ca4c87b60d3fbe377a6108c8979b8f4619ebf63df594f18d9468f55929006c4c9fa7e8abb9e41c1611ce9589d872f9c0e87eb1c5a863974e6052623a4a
   languageName: node
   linkType: hard
 
 "@react-navigation/native-stack@npm:^7.18.8":
-  version: 7.18.8
-  resolution: "@react-navigation/native-stack@npm:7.18.8"
+  version: 7.18.9
+  resolution: "@react-navigation/native-stack@npm:7.18.9"
   dependencies:
-    "@react-navigation/elements": "npm:^2.9.38"
+    "@react-navigation/elements": "npm:^2.9.39"
     color: "npm:^4.2.3"
     sf-symbols-typescript: "npm:^2.1.0"
     warn-once: "npm:^0.1.1"
   peerDependencies:
-    "@react-navigation/native": ^7.3.16
+    "@react-navigation/native": ^7.3.17
     react: ">= 18.2.0"
     react-native: "*"
     react-native-safe-area-context: ">= 4.0.0"
     react-native-screens: ">= 4.0.0"
-  checksum: 10c0/f9265453b752fd5e620d51268a9480133c56a8d11f95d125bb1c18c65de78bc6a6289e144ef634649bd61ee9a8d394e4ac6b12292603d5d8a9cf655b19e69179
+  checksum: 10c0/a8a2132e0ea7f6f290715be4fe575b91e4129596b879e3bff215fbd915c3dad1be61d7a3cc034596e6bc22b0bf6e59a2cb164b76e4a3365a59c570bf2e538bd4
   languageName: node
   linkType: hard
 
 "@react-navigation/native@npm:^7.3.16":
-  version: 7.3.16
-  resolution: "@react-navigation/native@npm:7.3.16"
+  version: 7.3.17
+  resolution: "@react-navigation/native@npm:7.3.17"
   dependencies:
-    "@react-navigation/core": "npm:^7.21.12"
+    "@react-navigation/core": "npm:^7.21.13"
     escape-string-regexp: "npm:^4.0.0"
     fast-deep-equal: "npm:^3.1.3"
     nanoid: "npm:^3.3.11"
@@ -3404,7 +3404,7 @@ __metadata:
   peerDependencies:
     react: ">= 18.2.0"
     react-native: "*"
-  checksum: 10c0/86193e9ee0b2e64e9148691b268b2a9e9769ac62ad58a281f09db79da171232d4bee736f67df97d6d1159909a96bf07c84de9bf8ddb346affb01b80e9cb8f8cd
+  checksum: 10c0/99d997ca9c483f8d9a98e489abf76b8999f9e35c3aafe80cef9707af5461c4cdcaf7035214380d0da305c490faf3a9e9519dbc9a14c69f6d81daf6b7685e1052
   languageName: node
   linkType: hard
 
@@ -3418,20 +3418,20 @@ __metadata:
   linkType: hard
 
 "@react-navigation/stack@npm:^7.10.22":
-  version: 7.10.22
-  resolution: "@react-navigation/stack@npm:7.10.22"
+  version: 7.10.23
+  resolution: "@react-navigation/stack@npm:7.10.23"
   dependencies:
-    "@react-navigation/elements": "npm:^2.9.38"
+    "@react-navigation/elements": "npm:^2.9.39"
     color: "npm:^4.2.3"
     use-latest-callback: "npm:^0.2.4"
   peerDependencies:
-    "@react-navigation/native": ^7.3.16
+    "@react-navigation/native": ^7.3.17
     react: ">= 18.2.0"
     react-native: "*"
     react-native-gesture-handler: ">= 2.0.0"
     react-native-safe-area-context: ">= 4.0.0"
     react-native-screens: ">= 4.0.0"
-  checksum: 10c0/3f5223c620a8c69a17def2b0a0ba74d7458ecbd898f3d329bc567aa6513e8fe974e0924156d504dd02a942af6ec3ce96531d4547347422640b282d83cb2f8bf8
+  checksum: 10c0/80adf3d30430137bb49cc0a1c930be20d0a9723691a3d55c52cb6c6a03a4991f292cc20095e9ac397f6a4e4aa38a349eab9b9dea01136e2642b28d6b323469fd
   languageName: node
   linkType: hard
 
@@ -4203,6 +4203,7 @@ __metadata:
     react-dom: "npm:19.2.3"
     react-native: "npm:0.85.0"
     react-native-builder-bob: "npm:^0.43.0"
+    react-native-config: "npm:^1.6.1"
     react-native-gesture-handler: "npm:^3.2.1"
     react-native-monorepo-config: "npm:^0.4.0"
     react-native-safe-area-context: "npm:^5.9.0"
@@ -4244,7 +4245,7 @@ __metadata:
     react-native: "npm:0.85.0"
     react-native-builder-bob: "npm:^0.43.0"
     react-native-svg: "npm:^15.12.0"
-    react-native-vision-camera: "patch:react-native-vision-camera@npm%3A4.7.0#~/.yarn/patches/react-native-vision-camera-npm-4.7.0-0f7ce208b2.patch"
+    react-native-vision-camera: "npm:4.7.0"
     react-native-web: "npm:~0.21.2"
     release-it: "npm:^20.2.0"
     turbo: "npm:^2.9.16"
@@ -7744,17 +7745,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"image-size@npm:^1.0.2":
-  version: 1.2.1
-  resolution: "image-size@npm:1.2.1"
-  dependencies:
-    queue: "npm:6.0.2"
-  bin:
-    image-size: bin/image-size.js
-  checksum: 10c0/f8b3c19d4476513f1d7e55c3e6db80997b315444743e2040d545cbcaee59be03d2eb40c46be949a8372697b7003fdb0c04925d704390a7f606bc8181e25c0ed4
-  languageName: node
-  linkType: hard
-
 "immer@npm:^11.0.0":
   version: 11.1.18
   resolution: "immer@npm:11.1.18"
@@ -7801,7 +7791,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"inherits@npm:2, inherits@npm:^2.0.3, inherits@npm:^2.0.4, inherits@npm:~2.0.3, inherits@npm:~2.0.4":
+"inherits@npm:2, inherits@npm:^2.0.3, inherits@npm:^2.0.4, inherits@npm:~2.0.4":
   version: 2.0.4
   resolution: "inherits@npm:2.0.4"
   checksum: 10c0/4e531f648b29039fb7426fb94075e6545faa1eb9fe83c29f0b6d9e7263aceb4289d2d4557db0d428188eeb449cc7c5e77b0a0b2c4e248ff2a65933a0dee49ef2
@@ -8832,15 +8822,15 @@ __metadata:
   linkType: hard
 
 "joi@npm:^17.2.1":
-  version: 17.13.5
-  resolution: "joi@npm:17.13.5"
+  version: 17.13.6
+  resolution: "joi@npm:17.13.6"
   dependencies:
     "@hapi/hoek": "npm:^9.3.0"
     "@hapi/topo": "npm:^5.1.0"
     "@sideway/address": "npm:^4.1.5"
     "@sideway/formula": "npm:^3.0.1"
     "@sideway/pinpoint": "npm:^2.0.0"
-  checksum: 10c0/755707ce30ff3173bce7430d74e0715cd9d802b2f4a58acbf3bcbbaa0b64093824ab6be5e64e73c7762e5072cb3b1c2ccdade1f1bd763e5b634fd33f98559ed2
+  checksum: 10c0/17fee2ec1cb8af6752a7b49962c83a81cd83deb2426fa1a93ab62ad89f2f387ed44a35d06a5734516cae9312f0d82f35e7211b87c79b7c78f0370da9a9b54920
   languageName: node
   linkType: hard
 
@@ -9415,70 +9405,70 @@ __metadata:
   languageName: node
   linkType: hard
 
-"metro-babel-transformer@npm:0.84.4":
-  version: 0.84.4
-  resolution: "metro-babel-transformer@npm:0.84.4"
+"metro-babel-transformer@npm:0.84.5":
+  version: 0.84.5
+  resolution: "metro-babel-transformer@npm:0.84.5"
   dependencies:
     "@babel/core": "npm:^7.25.2"
     flow-enums-runtime: "npm:^0.0.6"
     hermes-parser: "npm:0.35.0"
-    metro-cache-key: "npm:0.84.4"
+    metro-cache-key: "npm:0.84.5"
     nullthrows: "npm:^1.1.1"
-  checksum: 10c0/d1ac996666334bc1cfe9d399cbf4cd747b675f6f8f758c2317eebcc52bd76046ed864ddb7b270efeb8cf337940a61fb03912e5c859b7cbc54687c2f5c41a9d2a
+  checksum: 10c0/d105413dbe7887f05bf46b2c187e17abc7432bbabb6ac50caff2bf7460e5fa029654dd7478d502eb39987e0a1a0ec1d7660f1786cea53c7738da909ac319c59d
   languageName: node
   linkType: hard
 
-"metro-cache-key@npm:0.84.4":
-  version: 0.84.4
-  resolution: "metro-cache-key@npm:0.84.4"
+"metro-cache-key@npm:0.84.5":
+  version: 0.84.5
+  resolution: "metro-cache-key@npm:0.84.5"
   dependencies:
     flow-enums-runtime: "npm:^0.0.6"
-  checksum: 10c0/a82ab6367f11886d960cc8fa1f3aa54f6529fe30c16059c141c3e789084c50838fdd7e1a5528534cd9c11a74c63aa5c6a7461dbfa50e8c449b6141eaf2fd05e0
+  checksum: 10c0/2e3507b31b2d21f833a5cf78fadbb3d7042921212c418ffc870aeef05759d954e20d347e9b2c1953847ca43c64e85cedfa7e0e2b7ad5dcb685826b2dc6346bb9
   languageName: node
   linkType: hard
 
-"metro-cache@npm:0.84.4":
-  version: 0.84.4
-  resolution: "metro-cache@npm:0.84.4"
+"metro-cache@npm:0.84.5":
+  version: 0.84.5
+  resolution: "metro-cache@npm:0.84.5"
   dependencies:
     exponential-backoff: "npm:^3.1.1"
     flow-enums-runtime: "npm:^0.0.6"
     https-proxy-agent: "npm:^7.0.5"
-    metro-core: "npm:0.84.4"
-  checksum: 10c0/3bf7f3a1f85b4f1af05f4b2c71c78e56fd3262d967ee43f02e9ff6820254063af33a70b6549e3dc5e993a6a0b9df92e9279632ad9a8b1cde2577342f93df45eb
+    metro-core: "npm:0.84.5"
+  checksum: 10c0/fa590e17d8e16274c09b874e34df5d6cbf8912aec329d563a1d751a4ebc8c8cfa7c6133df1a240be1e2ebdada1f1d65e30ea97dbf58549fbeec81d632c073be8
   languageName: node
   linkType: hard
 
-"metro-config@npm:0.84.4, metro-config@npm:^0.84.0":
-  version: 0.84.4
-  resolution: "metro-config@npm:0.84.4"
+"metro-config@npm:0.84.5, metro-config@npm:^0.84.0":
+  version: 0.84.5
+  resolution: "metro-config@npm:0.84.5"
   dependencies:
     connect: "npm:^3.6.5"
     flow-enums-runtime: "npm:^0.0.6"
     jest-validate: "npm:^29.7.0"
-    metro: "npm:0.84.4"
-    metro-cache: "npm:0.84.4"
-    metro-core: "npm:0.84.4"
-    metro-runtime: "npm:0.84.4"
+    metro: "npm:0.84.5"
+    metro-cache: "npm:0.84.5"
+    metro-core: "npm:0.84.5"
+    metro-runtime: "npm:0.84.5"
     yaml: "npm:^2.6.1"
-  checksum: 10c0/f8aaf7d8cff9b486353b62f4746b0a70f99749bd4061f5ae847524aaedcd9c5a34bf176cbbe12fb33e771e8ed3c1496654b2578fa5ba8b9e4f856f0589744d98
+  checksum: 10c0/ba946982432e442a8187ca955a65dca18903c087e6f279433a9173a9283b72e32bb2bdd2ca0ccda491e5c068b9378725c6a6ba73dbe3e180cf0f089cd5523bdc
   languageName: node
   linkType: hard
 
-"metro-core@npm:0.84.4, metro-core@npm:^0.84.0":
-  version: 0.84.4
-  resolution: "metro-core@npm:0.84.4"
+"metro-core@npm:0.84.5, metro-core@npm:^0.84.0":
+  version: 0.84.5
+  resolution: "metro-core@npm:0.84.5"
   dependencies:
     flow-enums-runtime: "npm:^0.0.6"
     lodash.throttle: "npm:^4.1.1"
-    metro-resolver: "npm:0.84.4"
-  checksum: 10c0/19d859de16b5e082c9c31bed981c579a4e6d31a626c7829b725df9ae0ffb755d0ef7809ba9f8adf22d3921f5ffdd931ed77b21b95ca2ea17895f0c99b3cab831
+    metro-resolver: "npm:0.84.5"
+  checksum: 10c0/f351c27f84f83bd3ec1db4e06566dfbfb01c6ebe193c4aa59850661374208b548e5738091525fe642a63c6117c64b053489f529e0aa29c311ff871cf290c00c3
   languageName: node
   linkType: hard
 
-"metro-file-map@npm:0.84.4":
-  version: 0.84.4
-  resolution: "metro-file-map@npm:0.84.4"
+"metro-file-map@npm:0.84.5":
+  version: 0.84.5
+  resolution: "metro-file-map@npm:0.84.5"
   dependencies:
     debug: "npm:^4.4.0"
     fb-watchman: "npm:^2.0.0"
@@ -9489,75 +9479,75 @@ __metadata:
     micromatch: "npm:^4.0.4"
     nullthrows: "npm:^1.1.1"
     walker: "npm:^1.0.7"
-  checksum: 10c0/09ca829570d1d6dc5beb0534da8a7f2bfcae5415b0974fd5f58b4a05da95dbafdd47f7dc8dedeb11b6562ee9a92c4d918466d02a05cda6e1eaf2c400cbbe6fb4
+  checksum: 10c0/16c0fbdc0e50c1785048e707f3b70813d89c72388ef024fcd16a78d18705e335c14649e842f594d5146d6f592616b4cc13953e6abbf0769006b5a6219d4c22d4
   languageName: node
   linkType: hard
 
-"metro-minify-terser@npm:0.84.4":
-  version: 0.84.4
-  resolution: "metro-minify-terser@npm:0.84.4"
+"metro-minify-terser@npm:0.84.5":
+  version: 0.84.5
+  resolution: "metro-minify-terser@npm:0.84.5"
   dependencies:
     flow-enums-runtime: "npm:^0.0.6"
     terser: "npm:^5.15.0"
-  checksum: 10c0/c9b36c2adb8254c38bdedad9da8bf2b7fae7f45cbd883e590430a5fc9cad808af24dd08a9420925e15733dab886528ad553e3eeb3faffc53d3ad80e7e03e5f6d
+  checksum: 10c0/0fb7f2882d66698110027565a8a4ccd099d28df660ac3853a328575b457b24e2eb0a5ab06a000464fc86f25da34502e60cc1314c5decb90c98098378f90386d2
   languageName: node
   linkType: hard
 
-"metro-resolver@npm:0.84.4":
-  version: 0.84.4
-  resolution: "metro-resolver@npm:0.84.4"
+"metro-resolver@npm:0.84.5":
+  version: 0.84.5
+  resolution: "metro-resolver@npm:0.84.5"
   dependencies:
     flow-enums-runtime: "npm:^0.0.6"
-  checksum: 10c0/468334270598222e15cbee32af51a3b5e1f4fa6869794955b95d1134b28a58594e8e3879e841ccf00bbb5cd86c689a4481714d6c6a464931987d5333d2c55f80
+  checksum: 10c0/44822149fbd52f680461e94ac7f8bf0855461607ed8d286a5ad615b8bd4a6b113cf0f3c2c403285514c6e1f46cfe7c95e52d9b59633506701dee735b6e788599
   languageName: node
   linkType: hard
 
-"metro-runtime@npm:0.84.4, metro-runtime@npm:^0.84.0":
-  version: 0.84.4
-  resolution: "metro-runtime@npm:0.84.4"
+"metro-runtime@npm:0.84.5, metro-runtime@npm:^0.84.0":
+  version: 0.84.5
+  resolution: "metro-runtime@npm:0.84.5"
   dependencies:
     "@babel/runtime": "npm:^7.25.0"
     flow-enums-runtime: "npm:^0.0.6"
-  checksum: 10c0/e2b2e819027940c6bbd081e5650238d52b6c6d78561cd486b8c10cd1e7fce0213c66fa7f885e37ad5377fcd5726b1c9e473fba6de13938cdf2c966e82968c05f
+  checksum: 10c0/8f4de088ed0946b153d4afb51bb0e1dc7a36d276821ad7ee81fdbddcc72a7a8391f49d044c351c377387dbb955654078843a8fd11d3a3e41be4017d5d59a0848
   languageName: node
   linkType: hard
 
-"metro-source-map@npm:0.84.4, metro-source-map@npm:^0.84.0":
-  version: 0.84.4
-  resolution: "metro-source-map@npm:0.84.4"
+"metro-source-map@npm:0.84.5, metro-source-map@npm:^0.84.0":
+  version: 0.84.5
+  resolution: "metro-source-map@npm:0.84.5"
   dependencies:
     "@babel/traverse": "npm:^7.29.0"
     "@babel/types": "npm:^7.29.0"
     flow-enums-runtime: "npm:^0.0.6"
     invariant: "npm:^2.2.4"
-    metro-symbolicate: "npm:0.84.4"
+    metro-symbolicate: "npm:0.84.5"
     nullthrows: "npm:^1.1.1"
-    ob1: "npm:0.84.4"
+    ob1: "npm:0.84.5"
     source-map: "npm:^0.5.6"
     vlq: "npm:^1.0.0"
-  checksum: 10c0/39df4524022e07aa4b4d09dd874a9509eb9e2e1e491e80a35099020347ab6be2407851b026452296aad314b0eb7ecf14f9b6bab96bd7c31d47d8b1eb30279aaf
+  checksum: 10c0/9aedfc28c2f04b41bf68844b6daa4141455e9b748b5651384d5eea22b3c65457aaa3470a845f2b464cb3a2d9c16e1a8fd5b04a2347ea6241d5c9912b3b9755bd
   languageName: node
   linkType: hard
 
-"metro-symbolicate@npm:0.84.4":
-  version: 0.84.4
-  resolution: "metro-symbolicate@npm:0.84.4"
+"metro-symbolicate@npm:0.84.5":
+  version: 0.84.5
+  resolution: "metro-symbolicate@npm:0.84.5"
   dependencies:
     flow-enums-runtime: "npm:^0.0.6"
     invariant: "npm:^2.2.4"
-    metro-source-map: "npm:0.84.4"
+    metro-source-map: "npm:0.84.5"
     nullthrows: "npm:^1.1.1"
     source-map: "npm:^0.5.6"
     vlq: "npm:^1.0.0"
   bin:
     metro-symbolicate: src/index.js
-  checksum: 10c0/416a9ef694150a8ec708187743b74ab67e0b4fec39c64610b3771b584830117670a62acb9aa824f84a44efbb1cfec07aaf943d1aaf349d977eecf7c72bd8c0bf
+  checksum: 10c0/75defd592eea1a4b6ef5e0e1610bb21188764b9d56ccf52b16031524377ac9127d7af66dbc259bc85b1fe8afa9cd51b677c97a4c1d0fcc37d4494a08656f5fe6
   languageName: node
   linkType: hard
 
-"metro-transform-plugins@npm:0.84.4":
-  version: 0.84.4
-  resolution: "metro-transform-plugins@npm:0.84.4"
+"metro-transform-plugins@npm:0.84.5":
+  version: 0.84.5
+  resolution: "metro-transform-plugins@npm:0.84.5"
   dependencies:
     "@babel/core": "npm:^7.25.2"
     "@babel/generator": "npm:^7.29.1"
@@ -9565,34 +9555,34 @@ __metadata:
     "@babel/traverse": "npm:^7.29.0"
     flow-enums-runtime: "npm:^0.0.6"
     nullthrows: "npm:^1.1.1"
-  checksum: 10c0/7edb0c0d3655e9f5f5fb8bd8221ec297394b8730c959a3245ea81e50da8177ad7782f21696201a0dcb922281efd919e9548d5b819d8338e52d4b130f06333123
+  checksum: 10c0/3ef1e0c487c6b91b1f9eacfffb2f152094d67fb1b0d536030dd7a02d95da881acb19f0d03c0c4cffc7bca6e3d57538559e1d6fea9e610fe88946c2c0d9c1b9d7
   languageName: node
   linkType: hard
 
-"metro-transform-worker@npm:0.84.4":
-  version: 0.84.4
-  resolution: "metro-transform-worker@npm:0.84.4"
+"metro-transform-worker@npm:0.84.5":
+  version: 0.84.5
+  resolution: "metro-transform-worker@npm:0.84.5"
   dependencies:
     "@babel/core": "npm:^7.25.2"
     "@babel/generator": "npm:^7.29.1"
     "@babel/parser": "npm:^7.29.0"
     "@babel/types": "npm:^7.29.0"
     flow-enums-runtime: "npm:^0.0.6"
-    metro: "npm:0.84.4"
-    metro-babel-transformer: "npm:0.84.4"
-    metro-cache: "npm:0.84.4"
-    metro-cache-key: "npm:0.84.4"
-    metro-minify-terser: "npm:0.84.4"
-    metro-source-map: "npm:0.84.4"
-    metro-transform-plugins: "npm:0.84.4"
+    metro: "npm:0.84.5"
+    metro-babel-transformer: "npm:0.84.5"
+    metro-cache: "npm:0.84.5"
+    metro-cache-key: "npm:0.84.5"
+    metro-minify-terser: "npm:0.84.5"
+    metro-source-map: "npm:0.84.5"
+    metro-transform-plugins: "npm:0.84.5"
     nullthrows: "npm:^1.1.1"
-  checksum: 10c0/95924f9bcaf6df931bba2783f440d8fab29909bdde8cecdcc3bc7603e7de71e51728a34288f045694b616c94216d1fc683493b8a470e074c9c8a7f220aa9f9b5
+  checksum: 10c0/b4f147f97555feb0fe91114b7a49e8345a8065d88739ff217d26d17bc56fe707b2b1ed0533432dd27aa7169bd7542709ffee5edcfee7dc999c276cc891fbee7d
   languageName: node
   linkType: hard
 
-"metro@npm:0.84.4, metro@npm:^0.84.0":
-  version: 0.84.4
-  resolution: "metro@npm:0.84.4"
+"metro@npm:0.84.5, metro@npm:^0.84.0":
+  version: 0.84.5
+  resolution: "metro@npm:0.84.5"
   dependencies:
     "@babel/code-frame": "npm:^7.29.0"
     "@babel/core": "npm:^7.25.2"
@@ -9609,23 +9599,22 @@ __metadata:
     flow-enums-runtime: "npm:^0.0.6"
     graceful-fs: "npm:^4.2.4"
     hermes-parser: "npm:0.35.0"
-    image-size: "npm:^1.0.2"
     invariant: "npm:^2.2.4"
     jest-worker: "npm:^29.7.0"
     jsc-safe-url: "npm:^0.2.2"
     lodash.throttle: "npm:^4.1.1"
-    metro-babel-transformer: "npm:0.84.4"
-    metro-cache: "npm:0.84.4"
-    metro-cache-key: "npm:0.84.4"
-    metro-config: "npm:0.84.4"
-    metro-core: "npm:0.84.4"
-    metro-file-map: "npm:0.84.4"
-    metro-resolver: "npm:0.84.4"
-    metro-runtime: "npm:0.84.4"
-    metro-source-map: "npm:0.84.4"
-    metro-symbolicate: "npm:0.84.4"
-    metro-transform-plugins: "npm:0.84.4"
-    metro-transform-worker: "npm:0.84.4"
+    metro-babel-transformer: "npm:0.84.5"
+    metro-cache: "npm:0.84.5"
+    metro-cache-key: "npm:0.84.5"
+    metro-config: "npm:0.84.5"
+    metro-core: "npm:0.84.5"
+    metro-file-map: "npm:0.84.5"
+    metro-resolver: "npm:0.84.5"
+    metro-runtime: "npm:0.84.5"
+    metro-source-map: "npm:0.84.5"
+    metro-symbolicate: "npm:0.84.5"
+    metro-transform-plugins: "npm:0.84.5"
+    metro-transform-worker: "npm:0.84.5"
     mime-types: "npm:^3.0.1"
     nullthrows: "npm:^1.1.1"
     serialize-error: "npm:^2.1.0"
@@ -9635,7 +9624,7 @@ __metadata:
     yargs: "npm:^17.6.2"
   bin:
     metro: src/cli.js
-  checksum: 10c0/ff92915119db29cd855274f3789d391cba83c50cb92e22d1e9b8c729e7f6d39495e32540a22ca4c6591eea6a847ade49fcfa5faab01b2300227e3f1fc7df359c
+  checksum: 10c0/be9981927748f56c2f50f10d1de06e11917421718f3107dad95ee149892a8e0fb91bddc0b17f091984259c1b41bb01a193dc6280785ae6e4a5ad804fbd61c6d2
   languageName: node
   linkType: hard
 
@@ -9992,12 +9981,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ob1@npm:0.84.4":
-  version: 0.84.4
-  resolution: "ob1@npm:0.84.4"
+"ob1@npm:0.84.5":
+  version: 0.84.5
+  resolution: "ob1@npm:0.84.5"
   dependencies:
     flow-enums-runtime: "npm:^0.0.6"
-  checksum: 10c0/8bf3a3bdc2b27f1b1b60569c31ff2d9d829025f9a1ce7388b5e810242e48672c8d6b24e5972d6e30aef4d84f6894d12b13d0c6c418460d031da1972b96920bba
+  checksum: 10c0/f00c3bdb8c8b53de03a3352a062e170e1ba1cf1977b3dfab492882a0f6fa9eccb5503dde012b1ef7d24c5060f5a6439457e850b98bd4148e2578ffa650b414b8
   languageName: node
   linkType: hard
 
@@ -10673,15 +10662,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"queue@npm:6.0.2":
-  version: 6.0.2
-  resolution: "queue@npm:6.0.2"
-  dependencies:
-    inherits: "npm:~2.0.3"
-  checksum: 10c0/cf987476cc72e7d3aaabe23ccefaab1cd757a2b5e0c8d80b67c9575a6b5e1198807ffd4f0948a3f118b149d1111d810ee773473530b77a5c606673cac2c9c996
-  languageName: node
-  linkType: hard
-
 "quickjs-wasi@npm:^0.0.1":
   version: 0.0.1
   resolution: "quickjs-wasi@npm:0.0.1"
@@ -10801,6 +10781,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-config@npm:^1.6.1":
+  version: 1.6.1
+  resolution: "react-native-config@npm:1.6.1"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+    react-native-windows: ">=0.61"
+  peerDependenciesMeta:
+    react-native-windows:
+      optional: true
+  checksum: 10c0/9e2bbb7fb04bac878471f7b06132d84233c482952fc7dd0b651669a62cd35c35428302c7502a92898402505ec9b8d7997848122356b42de5c072dcce549d5813
+  languageName: node
+  linkType: hard
+
 "react-native-gesture-handler@npm:^3.2.1":
   version: 3.2.1
   resolution: "react-native-gesture-handler@npm:3.2.1"
@@ -10877,26 +10871,6 @@ __metadata:
     react-native-worklets-core:
       optional: true
   checksum: 10c0/cfc9694fe1f2b729581913cf8c1eee8def28c905d14ff1cc1452e090537ecacb436e023bf825e81d6a99af953eb4a7ed3ac7b5000590179882cfb2cbc71e1493
-  languageName: node
-  linkType: hard
-
-"react-native-vision-camera@patch:react-native-vision-camera@npm%3A4.7.0#~/.yarn/patches/react-native-vision-camera-npm-4.7.0-0f7ce208b2.patch":
-  version: 4.7.0
-  resolution: "react-native-vision-camera@patch:react-native-vision-camera@npm%3A4.7.0#~/.yarn/patches/react-native-vision-camera-npm-4.7.0-0f7ce208b2.patch::version=4.7.0&hash=aebf4b"
-  peerDependencies:
-    "@shopify/react-native-skia": "*"
-    react: "*"
-    react-native: "*"
-    react-native-reanimated: "*"
-    react-native-worklets-core: "*"
-  peerDependenciesMeta:
-    "@shopify/react-native-skia":
-      optional: true
-    react-native-reanimated:
-      optional: true
-    react-native-worklets-core:
-      optional: true
-  checksum: 10c0/50a3d3a616a49822fbd68a292dc3533bdc5e1071bcc02d0106cd33615e9b3463acb2303db910d920dbc6a2bacf82f8dae1a4e9144fed393d8d903e8e42b6f85a
   languageName: node
   linkType: hard
 

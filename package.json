@@ -85,7 +85,7 @@
     "react-native": "0.85.0",
     "react-native-builder-bob": "^0.43.0",
     "react-native-svg": "^15.12.0",
-    "react-native-vision-camera": "patch:react-native-vision-camera@npm%3A4.7.0#~/.yarn/patches/react-native-vision-camera-npm-4.7.0-0f7ce208b2.patch",
+    "react-native-vision-camera": "4.7.0",
     "react-native-web": "~0.21.2",
     "release-it": "^20.2.0",
     "turbo": "^2.9.16",

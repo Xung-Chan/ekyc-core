@@ -1,3 +1,4 @@
+import Config from 'react-native-config';
 import { ENDPOINTS } from '../../../../api/endpoints';
 import { api, uploadFileUri } from '../../../../api/fetch';
 import type { OcrCCCDRequest, OcrCCCDResponse } from '../dtos/OcrCCCDto';
@@ -17,7 +18,7 @@ export const ekycApi = {
     formData.append(
       'ekycRequest',
       JSON.stringify({
-        ekycTransactionId: '8299d4dd-96a1-4f6f-a5aa-02f064715bb4',
+        ekycTransactionId: Config.EKYC_TRANSACTION_ID || '',
         ekycType: 'SIGNUP',
         ekycService: 'OCR',
         docType: 'CCCD',

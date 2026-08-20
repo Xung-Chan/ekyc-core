@@ -1,17 +1,16 @@
 import axios, { AxiosError } from 'axios';
+import Config from 'react-native-config';
 import type { ApiError, RequestOptions } from './api-type';
 export const API_CONFIG = {
-  BASE_URL: 'https://dev-sso.f88.co/cobra-sso-myf-service',
-  // BASE_URL: 'https://jsonplaceholder.typicode.com',
+  BASE_URL: Config.BASE_URL || 'https://jsonplaceholder.typicode.com',
   TIMEOUT: 30000,
   HEADERS: {
-    // 'Content-Type': 'application/json',
     'deviceid': 'V2361A',
-    'oauthsessionid': '95de0b13-f10c-4657-a7a2-e4200313b350',
+    'oauthsessionid': Config.OAUTH_SESSION_ID || '',
     'x-feature-scope': 'onboarding-oauth',
     'workspaceid': '',
     'devicetoken': '',
-    'Authorization': 'Bearer a1e8eee8-b03e-4ed1-8a3c-d0b2b87eef2b',
+    'Authorization': `Bearer ${Config.ACCESS_TOKEN}`,
   },
 } as const;
 
@@ -135,41 +134,13 @@ export const api = {
 
   upload: async <T>(endpoint: string, formData: FormData): Promise<T> => {
     // const url = `${API_CONFIG.BASE_URL}${endpoint}`;
-    const url = `https://api.escuelajs.co/api/v1/files/upload`;
-    return new Promise<T>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', url);
-
-      // Gắn headers xác thực từ API_CONFIG
-      Object.entries(API_CONFIG.HEADERS).forEach(([key, value]) => {
-        xhr.setRequestHeader(key, value);
-      });
-
-      xhr.timeout = API_CONFIG.TIMEOUT;
-
-      xhr.onreadystatechange = () => {
-        if (xhr.readyState !== 4) return;
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            resolve(JSON.parse(xhr.responseText) as T);
-          } catch {
-            resolve(xhr.responseText as unknown as T);
-          }
-        } else {
-          reject(
-            new ApiRequestError(
-              xhr.responseText || `HTTP ${xhr.status}`,
-              xhr.status
-            )
-          );
-        }
-      };
-
-      xhr.onerror = () => reject(new ApiRequestError('Network error', 0));
-      xhr.ontimeout = () => reject(new ApiRequestError('Request timeout', 0));
-
-      xhr.send(formData);
-    });
+    try {
+      const response = await apiClient.post(endpoint, formData);
+      return response.data;
+    } catch (error) {
+      console.log('=== UPLOAD TEST FAILED ===', error);
+      return {} as T;
+    }
   },
 };
 
