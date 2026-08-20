@@ -14,7 +14,8 @@ export const ekycRepository: GetOcrReposotiry = {
       frontSide: input.frontSide,
       backSide: input.backSide,
     };
-    const response = await ekycApi.getOcr(request);
+    const response = await ekycApi.testApi(request);
+    // const response = await ekycApi.getOcr(request);
     return ekycMapper.toDomain(response);
   },
 };

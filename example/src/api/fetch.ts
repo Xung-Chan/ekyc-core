@@ -134,51 +134,60 @@ export const api = {
     apiRequest<T>(endpoint, { ...options, method: 'DELETE' }),
 
   upload: async <T>(endpoint: string, formData: FormData): Promise<T> => {
-    const url = `${API_CONFIG.BASE_URL}${endpoint}`;
-    const headers: Record<string, string> = {
-      ...API_CONFIG.HEADERS,
-      'Content-Type': 'multipart/form-data',
-    };
+    // const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+    const url = `https://api.escuelajs.co/api/v1/files/upload`;
+    return new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
 
-    console.log('================ [API UPLOAD DEBUG] ================');
-    console.log(`[API Upload] Target URL: ${url}`);
-    console.log(`[API Upload] Headers:`, JSON.stringify(headers, null, 2));
-
-    // Log FormData details (React Native internal _parts format)
-    // @ts-ignore
-    const parts = formData._parts || [];
-    console.log('[API Upload] FormData Parts:');
-    parts.forEach(([key, value]: any) => {
-      if (value && typeof value === 'object') {
-        console.log(
-          `  - ${key}: [File] uri: "${value.uri}", name: "${value.name}", type: "${value.type}"`
-        );
-      } else {
-        console.log(`  - ${key}: [Text] "${value}"`);
-      }
-    });
-
-    try {
-      const response = await axios.post(url, formData, {
-        headers: headers,
-        timeout: 30000,
+      // Gắn headers xác thực từ API_CONFIG
+      Object.entries(API_CONFIG.HEADERS).forEach(([key, value]) => {
+        xhr.setRequestHeader(key, value);
       });
-      // const response = await fetch(url, {
-      //     method: 'POST',
-      //     body: formData,
-      //     headers,
-      // });
-      return response.data;
-    } catch (error: any) {
-      console.error('[API Upload ERROR] Detailed Fetch Error:');
-      console.error('  - Name:', error?.name);
-      console.error('  - Message:', error?.message);
-      console.error('  - Stack:', error?.stack);
-      console.error(
-        '  - Full Error Object:',
-        JSON.stringify(error, Object.getOwnPropertyNames(error))
-      );
-      throw error;
-    }
+
+      xhr.timeout = API_CONFIG.TIMEOUT;
+
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState !== 4) return;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText) as T);
+          } catch {
+            resolve(xhr.responseText as unknown as T);
+          }
+        } else {
+          reject(
+            new ApiRequestError(
+              xhr.responseText || `HTTP ${xhr.status}`,
+              xhr.status
+            )
+          );
+        }
+      };
+
+      xhr.onerror = () => reject(new ApiRequestError('Network error', 0));
+      xhr.ontimeout = () => reject(new ApiRequestError('Request timeout', 0));
+
+      xhr.send(formData);
+    });
   },
 };
+
+/**
+ * Chuyển file:// URI thành data: URI (base64) để upload an toàn.
+ *
+ * Lý do: RN's NetworkingModule (OkHttp) gặp "Stream Closed" khi đọc
+ * FileInputStream từ file:// URI. Cách fix: load file vào memory qua
+ * fetch(file://...) → Blob → FileReader.readAsDataURL → data: URI.
+ * Data URI được NetworkingModule xử lý trực tiếp, không qua FileInputStream.
+ */
+export async function uploadFileUri(uri: string): Promise<string> {
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('FileReader: cannot read file'));
+    reader.readAsDataURL(blob);
+  });
+}
