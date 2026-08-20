@@ -1,4 +1,23 @@
-export interface OcrCCCDEntity {
+export interface OcrCCCDRequest {
+  ekycTransactionId: string;
+  ekycType: string;
+  businessAction: string;
+  docType: string;
+  frontSide: OcrCCCDUploadFile;
+  backSide: OcrCCCDUploadFile;
+}
+export type OcrCCCDUploadFile = {
+  uri: string;
+  name: string;
+  type: string;
+};
+export interface OcrCCCDResponse {
+  error: boolean;
+  errorReason: string;
+  toastMessage: string;
+  object: OcrCCCDObject;
+}
+export interface OcrCCCDObject {
   cccdFrontImageBase64?: string;
   ekycService?: string;
   ekycTransactionRefId?: string;

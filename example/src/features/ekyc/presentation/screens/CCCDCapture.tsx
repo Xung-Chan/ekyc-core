@@ -15,12 +15,12 @@ import {
   type CardScannerCameraViewRef,
   type ScanCardResult,
 } from '@xungchan/ekyc-core';
-import type { ScreenProps } from '../../../../navagation/AppNavigator';
+import { useEkycVM } from '../viewmodels/cccdCaptureVM';
 
-export default function CCCDCapture({ navigation }: ScreenProps) {
+export default function CCCDCapture() {
   const cardCameraRef = useRef<CardScannerCameraViewRef>(null);
+  const { setFrontImage, setBackImage, navigateToPreview } = useEkycVM();
 
-  const [frontImagePath, setFrontImagePath] = useState<string | null>(null);
   const [currentSide, setCurrentSide] = useState<'front' | 'back'>('front');
   const [isBusy, setIsBusy] = useState(false);
 
@@ -35,21 +35,12 @@ export default function CCCDCapture({ navigation }: ScreenProps) {
     }
 
     if (currentSide === 'front') {
-      setFrontImagePath(path);
+      setFrontImage(path);
       setCurrentSide('back');
     } else {
-      const frontPath = frontImagePath;
-      const backPath = path;
-
-      // Reset state for next time
-      setFrontImagePath(null);
+      setBackImage(path);
       setCurrentSide('front');
-
-      // Navigate to preview
-      navigation.navigate('CCCDCapturePreview', {
-        frontImagePath: frontPath,
-        backImagePath: backPath,
-      });
+      navigateToPreview();
     }
   };
 

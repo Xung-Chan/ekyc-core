@@ -8,21 +8,9 @@ import CCCDCapturePreview from '../features/ekyc/presentation/screens/CCCDCaptur
 import CCCDOcr from '../features/ekyc/presentation/screens/CCCDOcr';
 
 export type RootStackParamList = {
-  CCCDCapture:
-    | {
-        frontImagePath?: string | null;
-        backImagePath?: string | null;
-        recaptureSide?: 'front' | 'back' | null;
-      }
-    | undefined;
-  CCCDCapturePreview: {
-    frontImagePath: string | null;
-    backImagePath: string | null;
-  };
-  CCCDOcr: {
-    frontImagePath: string | null;
-    backImagePath: string | null;
-  };
+  CCCDCapture: undefined;
+  CCCDCapturePreview: undefined;
+  CCCDOcr: undefined;
 };
 
 export type ScreenProps = NativeStackScreenProps<RootStackParamList, any>;

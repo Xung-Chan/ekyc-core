@@ -1,10 +1,14 @@
 import { StyleSheet, View } from 'react-native';
 import AppNavigator from './navagation/AppNavigator';
+import { Provider } from 'react-redux';
+import { store } from './store';
 
 export default function App() {
   return (
     <View style={styles.container}>
-      <AppNavigator />
+      <Provider store={store}>
+        <AppNavigator />
+      </Provider>
     </View>
   );
 }

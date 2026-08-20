@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,49 +10,55 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import type { ScreenProps } from '../../../../navagation/AppNavigator';
-import type { OcrCCCDEntity } from '../../datascource/dtos/OcrCCCDto';
+import { useEkycVM } from '../viewmodels/cccdCaptureVM';
 
-export default function CCCDOcr({ navigation, route }: ScreenProps) {
-  const frontImagePath = route.params?.frontImagePath || null;
-  const backImagePath = route.params?.backImagePath || null;
+export default function CCCDOcr({ navigation }: ScreenProps) {
+  const {
+    frontImage,
+    backImage,
+    ocrData,
+    loading,
+    error,
+    getOcr,
+    navigateToCapture,
+  } = useEkycVM();
+
+  useEffect(() => {
+    getOcr();
+  }, [getOcr]);
+
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Lỗi', error);
+    }
+  }, [error]);
 
   const handleBack = () => {
     navigation.goBack();
   };
 
   const handleRecapture = () => {
-    // Navigate back to the capture screen to restart the flow
-    navigation.navigate('CCCDCapture');
+    navigateToCapture();
   };
 
   const handleUseInfo = () => {
     Alert.alert('Thành công', 'Thông tin của bạn đã được xác thực thành công!');
   };
 
-  // Mock DTO data representing the entity extracted
-  const ocrEntity: OcrCCCDEntity = {
-    docType: 'cccd',
-    frontImageUrl: frontImagePath || undefined,
-    backImageUrl: backImagePath || undefined,
-    extractData: {
-      documentNumber: '012345678901',
-      fullName: 'NGUYỄN VĂN A',
-      dateOfBirth: '01/01/1990',
-      gender: 'Nam',
-      nationality: 'Việt Nam',
-      placeOfOrigin: 'Hà Nội',
-      placeOfResidence: '123 Đường Láng, Láng Thượng, Đống Đa, Hà Nội',
-      placeOfIssue:
-        'Cục trưởng Cục Cảnh sát quản lý hành chính về trật tự xã hội',
-      dateOfIssue: '01/01/2020',
-      expiryDate: '01/01/2035',
-    },
-  };
+  const extractData = ocrData?.extractData;
 
-  const { extractData } = ocrEntity;
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#15803D" />
+        <Text style={styles.loadingText}>Đang nhận diện thông tin...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -102,9 +109,9 @@ export default function CCCDOcr({ navigation, route }: ScreenProps) {
         <View style={styles.cardsGrid}>
           <View style={styles.cardBorder}>
             <View style={styles.cardWrapper}>
-              {frontImagePath ? (
+              {frontImage?.uri ? (
                 <Image
-                  source={{ uri: frontImagePath }}
+                  source={{ uri: frontImage.uri }}
                   style={styles.cardImage}
                   resizeMode="cover"
                 />
@@ -116,9 +123,9 @@ export default function CCCDOcr({ navigation, route }: ScreenProps) {
 
           <View style={styles.cardBorder}>
             <View style={styles.cardWrapper}>
-              {backImagePath ? (
+              {backImage?.uri ? (
                 <Image
-                  source={{ uri: backImagePath }}
+                  source={{ uri: backImage.uri }}
                   style={styles.cardImage}
                   resizeMode="cover"
                 />
@@ -492,6 +499,19 @@ const styles = StyleSheet.create({
     color: '#15803D',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111C2D',
     fontFamily: 'Inter',
   },
 });

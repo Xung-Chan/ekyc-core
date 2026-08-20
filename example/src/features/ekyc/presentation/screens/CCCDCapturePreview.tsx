@@ -11,25 +11,30 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { ScreenProps } from '../../../../navagation/AppNavigator';
+import { useEkycVM } from '../viewmodels/cccdCaptureVM';
 
-export default function CCCDCapturePreview({ navigation, route }: ScreenProps) {
-  const frontImagePath = route.params?.frontImagePath || null;
-  const backImagePath = route.params?.backImagePath || null;
+export default function CCCDCapturePreview({ navigation }: ScreenProps) {
+  const {
+    frontImage,
+    backImage,
+    setFrontImage,
+    setBackImage,
+    navigateToOcr,
+    navigateToCapture,
+  } = useEkycVM();
 
   const handleBack = () => {
     navigation.goBack();
   };
 
   const handleConfirm = () => {
-    navigation.navigate('CCCDOcr', {
-      frontImagePath,
-      backImagePath,
-    });
+    navigateToOcr();
   };
 
   const handleRecaptureAll = () => {
-    // Navigate back to capture screen to start over from front side
-    navigation.navigate('CCCDCapture');
+    setFrontImage(null);
+    setBackImage(null);
+    navigateToCapture();
   };
 
   return (
@@ -79,9 +84,9 @@ export default function CCCDCapturePreview({ navigation, route }: ScreenProps) {
         </View>
 
         <View style={styles.cardContainer}>
-          {frontImagePath ? (
+          {frontImage?.uri ? (
             <Image
-              source={{ uri: frontImagePath }}
+              source={{ uri: frontImage.uri }}
               style={styles.cardImage}
               resizeMode="cover"
             />
@@ -98,9 +103,9 @@ export default function CCCDCapturePreview({ navigation, route }: ScreenProps) {
         </View>
 
         <View style={styles.cardContainer}>
-          {backImagePath ? (
+          {backImage?.uri ? (
             <Image
-              source={{ uri: backImagePath }}
+              source={{ uri: backImage.uri }}
               style={styles.cardImage}
               resizeMode="cover"
             />
