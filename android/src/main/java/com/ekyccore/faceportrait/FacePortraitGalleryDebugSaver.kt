@@ -1,4 +1,4 @@
-package com.faceportrait
+package com.ekyccore.faceportrait
 
 import android.content.ContentValues
 import android.content.Context

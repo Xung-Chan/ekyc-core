@@ -1,4 +1,4 @@
-package com.faceportrait
+package com.ekyccore.faceportrait
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -17,7 +17,6 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.abs
-import kotlin.math.min
 import kotlin.math.pow
 
 internal data class FacePortraitPreviewResult(

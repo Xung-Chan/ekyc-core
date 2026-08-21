@@ -1,4 +1,4 @@
-package com.faceportrait.scanner
+package com.ekyccore.cardscanner
 
 import android.content.ContentValues
 import android.content.Context

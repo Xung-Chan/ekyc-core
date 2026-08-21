@@ -1,6 +1,7 @@
-package com.faceportrait
+package com.ekyccore.cardscanner
 
 import android.net.Uri
+import com.ekyccore.NativeCardScannerSpec
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -9,9 +10,6 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
-import com.faceportrait.scanner.CardScannerPipeline
-import com.faceportrait.scanner.CardScannerPipelineHolder
-import com.faceportrait.scanner.ManualCardCaptureDebugSaver
 import java.io.File
 import java.util.concurrent.Executors
 

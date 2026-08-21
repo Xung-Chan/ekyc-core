@@ -1,4 +1,4 @@
-package com.faceportrait
+package com.ekyccore.faceportrait
 
 import com.facebook.react.bridge.ReadableMap
 import kotlin.math.min

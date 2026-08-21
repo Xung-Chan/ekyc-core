@@ -120,11 +120,11 @@
     ]
   },
   "codegenConfig": {
-    "name": "FacePortraitSpec",
+    "name": "EkycCoreSpec",
     "type": "modules",
     "jsSrcsDir": "src",
     "android": {
-      "javaPackageName": "com.faceportrait"
+      "javaPackageName": "com.ekyccore"
     }
   },
   "prettier": {

@@ -1,12 +1,12 @@
-package com.faceportrait
+package com.ekyccore.faceportrait
 
 import android.util.Log
-import com.faceportrait.dto.FacePortraitFinalizeParams
-import com.faceportrait.dto.FacePortraitFinalizeResult
+import com.ekyccore.NativeFacePortraitSpec
+import com.ekyccore.faceportrait.dto.FacePortraitFinalizeParams
+import com.ekyccore.faceportrait.dto.FacePortraitFinalizeResult
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableMap
-import com.faceportrait.NativeFacePortraitSpec
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors

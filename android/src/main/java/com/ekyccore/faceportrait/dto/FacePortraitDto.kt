@@ -1,4 +1,4 @@
-package com.faceportrait.dto
+package com.ekyccore.faceportrait.dto
 
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
