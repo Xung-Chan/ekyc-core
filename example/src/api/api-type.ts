@@ -7,7 +7,7 @@ import type { AxiosRequestConfig } from 'axios';
 /**
  * Authentication API Request/Response Types
  */
-export interface ApiError extends Error {
+export class ApiError extends Error {
   error?: boolean;
   statusCode?: string;
   errorCode?: string;
@@ -16,6 +16,15 @@ export interface ApiError extends Error {
   titleMessage?: string;
   messageType?: string;
   nextAction?: string;
+
+  constructor(
+    message: string,
+    params: Partial<Omit<ApiError, keyof Error>> = {}
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    Object.assign(this, params);
+  }
 }
 
 export interface ApiResponse<T> {

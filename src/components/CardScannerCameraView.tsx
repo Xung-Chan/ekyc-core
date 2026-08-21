@@ -138,7 +138,7 @@ export type CardScannerCameraViewGuideConfig = {
   aspectRatio?: number;
 };
 
-export type CardScannerCameraViewProps = {
+export interface CardScannerCameraViewProps {
   isActive?: boolean;
   targetFps?: number;
   guideFrame?: CardScannerCameraViewGuideConfig;
@@ -148,7 +148,10 @@ export type CardScannerCameraViewProps = {
   children?: React.ReactNode;
   showGuide?: boolean;
   onRetry?: () => void;
-};
+}
+export interface CardScannerCameraInnerProps extends CardScannerCameraViewProps {
+  onAutoRetry: () => void;
+}
 
 export type CardScannerCameraViewRef = {
   takePhoto: () => Promise<string | null>;
@@ -161,7 +164,7 @@ export type CardScannerCameraViewRef = {
 // Separated so hook execution only starts when camera permissions are already granted.
 const CardScannerCameraInner = forwardRef<
   CardScannerCameraViewRef,
-  CardScannerCameraViewProps
+  CardScannerCameraInnerProps
 >(
   (
     {
@@ -174,9 +177,11 @@ const CardScannerCameraInner = forwardRef<
       children,
       showGuide = true,
       onRetry,
+      onAutoRetry,
     },
     ref
   ) => {
+    console.log('rendering');
     const device = useCameraDevice('back');
     const format = useCameraFormat(device, [
       { fps: targetFps },
@@ -187,6 +192,27 @@ const CardScannerCameraInner = forwardRef<
     const cameraRef = useRef<Camera>(null);
     const [busy, setBusy] = useState(false);
     const captureLockRef = useRef(false);
+    const [isTimeout, setIsTimeout] = useState(false);
+
+    useEffect(() => {
+      if (device != null) {
+        setIsTimeout(false);
+        return undefined;
+      }
+
+      const retryTimer = setTimeout(() => {
+        onAutoRetry();
+      }, 500);
+
+      const timeoutTimer = setTimeout(() => {
+        setIsTimeout(true);
+      }, 3000);
+
+      return () => {
+        clearTimeout(retryTimer);
+        clearTimeout(timeoutTimer);
+      };
+    }, [device, onAutoRetry]);
 
     const [previewSize, setPreviewSize] = useState({
       width: SCREEN.width,
@@ -350,6 +376,13 @@ const CardScannerCameraInner = forwardRef<
     );
 
     if (device == null) {
+      if (!isTimeout) {
+        return (
+          <View style={[styles.permissionPlaceholder, style]}>
+            <ActivityIndicator size="large" color="#ffffff" />
+          </View>
+        );
+      }
       return (
         <View style={[styles.permissionPlaceholder, style]}>
           <Text style={styles.permissionTitle}>Không tìm thấy camera.</Text>
@@ -469,9 +502,18 @@ export const CardScannerCameraView = forwardRef<
   const { hasPermission, requestPermission } = useCameraPermission();
   const didAutoRequestCameraPermissionRef = useRef(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const autoRetryCountRef = useRef(0);
 
   const handleRetry = useCallback(() => {
+    autoRetryCountRef.current = 0;
     setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  const handleAutoRetry = useCallback(() => {
+    if (autoRetryCountRef.current < 3) {
+      autoRetryCountRef.current += 1;
+      setRefreshKey((prev) => prev + 1);
+    }
   }, []);
 
   const openCameraPermissionSettings = useCallback(async () => {
@@ -536,6 +578,7 @@ export const CardScannerCameraView = forwardRef<
       ref={ref}
       key={refreshKey}
       onRetry={handleRetry}
+      onAutoRetry={handleAutoRetry}
       {...props}
     />
   );

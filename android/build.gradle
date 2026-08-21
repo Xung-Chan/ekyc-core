@@ -19,7 +19,7 @@ apply plugin: "kotlin-android"
 apply plugin: "com.facebook.react"
 
 android {
-  namespace "com.faceportrait"
+  namespace "com.ekyccore"
 
   compileSdkVersion getExtOrDefault("compileSdkVersion", 36)
 

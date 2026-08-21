@@ -6,8 +6,10 @@ import androidx.exifinterface.media.ExifInterface
 import org.opencv.android.OpenCVLoader
 import org.opencv.core.Core
 import org.opencv.core.Mat
+import org.opencv.core.MatOfPoint
 import org.opencv.core.Rect
 import org.opencv.imgcodecs.Imgcodecs
+import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.util.UUID
 import kotlin.math.max
@@ -255,6 +257,32 @@ class CardScannerPipeline(context: Context) {
       )
       sub = Mat(base, Rect(x, y, w, h))
       cloned = sub.clone()
+
+      if (!isDocumentPresent(cloned)) {
+        return CropJpegOnlyResult(
+          success = false,
+          croppedAbsolutePath = null,
+          appliedX = x,
+          appliedY = y,
+          appliedW = w,
+          appliedH = h,
+          errorCode = "NO_DOCUMENT_FOUND",
+          errorMessage = "Không tìm thấy giấy tờ trong khung hình",
+          debugDecodedWidth = decW,
+          debugDecodedHeight = decH,
+          debugExifOrientation = exifTag,
+          debugNormalizedWidth = nW ?: decW,
+          debugNormalizedHeight = nH ?: decH,
+          debugCropCoordinateSpace = cropCoordinateSpace,
+          debugBufferOrientation = bufferOrientation,
+          debugExpectedUprightWidth = if (useUpright) expW else null,
+          debugExpectedUprightHeight = if (useUpright) expH else null,
+          debugSkippedUprightRotation = skippedUprightRotate,
+          debugSourcePhotoWidth = if (useUpright) sourcePhotoWidth else 0,
+          debugSourcePhotoHeight = if (useUpright) sourcePhotoHeight else 0,
+        )
+      }
+
       val outFile = File(appContext.cacheDir, "card_manual_crop_${UUID.randomUUID()}.jpg")
       if (!Imgcodecs.imwrite(outFile.absolutePath, cloned)) {
         return CropJpegOnlyResult(
@@ -327,6 +355,40 @@ class CardScannerPipeline(context: Context) {
     } catch (_: Throwable) {
       null
     }
+
+  private fun isDocumentPresent(mat: Mat): Boolean {
+    val gray = Mat()
+    Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+
+    val blurred = Mat()
+    Imgproc.GaussianBlur(gray, blurred, org.opencv.core.Size(5.0, 5.0), 0.0)
+
+    val edges = Mat()
+    Imgproc.Canny(blurred, edges, 50.0, 150.0)
+
+    val nonZeroCount = Core.countNonZero(edges)
+    val totalPixels = edges.cols() * edges.rows()
+    val edgeDensity = nonZeroCount.toDouble() / totalPixels
+
+    val contours = ArrayList<MatOfPoint>()
+    val hierarchy = Mat()
+    Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+
+    // Clean up allocated Mats
+    gray.release()
+    blurred.release()
+    edges.release()
+    hierarchy.release()
+    val contoursCount = contours.size
+    for (c in contours) {
+      c.release()
+    }
+
+    Log.i(LOG_MANUAL_CROP, "isDocumentPresent: edgeDensity=$edgeDensity, contoursCount=$contoursCount")
+
+    // Standard thresholds: edge density at least 1.2% (0.012) and at least 10 contours
+    return edgeDensity >= 0.012 && contoursCount >= 10
+  }
 
   private fun normalizeToUprightMat(src: Mat, orientation: String): Mat {
     val out = Mat()

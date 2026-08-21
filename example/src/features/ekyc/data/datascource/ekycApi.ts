@@ -1,18 +1,10 @@
 import Config from 'react-native-config';
 import { ENDPOINTS } from '../../../../api/endpoints';
-import { api, uploadFileUri } from '../../../../api/fetch';
+import { api } from '../../../../api/fetch';
 import type { OcrCCCDRequest, OcrCCCDResponse } from '../dtos/OcrCCCDto';
 
 export const ekycApi = {
   async getOcr(request: OcrCCCDRequest): Promise<OcrCCCDResponse> {
-    // Chuyển file:// URI → data: URI (base64) để tránh "Stream Closed" trong OkHttp.
-    // RN's NetworkingModule không thể đọc FileInputStream từ file:// URI ổn định;
-    // data: URI được xử lý trực tiếp trong memory, không có race condition.
-    const [frontDataUri, backDataUri] = await Promise.all([
-      uploadFileUri(request.frontSide.uri),
-      uploadFileUri(request.backSide.uri),
-    ]);
-
     const formData = new FormData();
 
     formData.append(
@@ -22,19 +14,17 @@ export const ekycApi = {
         ekycType: 'SIGNUP',
         ekycService: 'OCR',
         docType: 'CCCD',
-        // ekycType: request.ekycType,
-        // docType: request.docType,
       })
     );
 
     formData.append('frontSide', {
-      uri: frontDataUri,
+      uri: urimapper(request.frontSide.uri),
       name: request.frontSide.name,
       type: request.frontSide.type,
     } as any);
 
     formData.append('backSide', {
-      uri: backDataUri,
+      uri: urimapper(request.backSide.uri),
       name: request.backSide.name,
       type: request.backSide.type,
     } as any);
@@ -42,14 +32,9 @@ export const ekycApi = {
     return api.upload(ENDPOINTS.OCR, formData);
   },
   async testApi(request: OcrCCCDRequest): Promise<OcrCCCDResponse> {
-    const [frontDataUri] = await Promise.all([
-      uploadFileUri(request.frontSide.uri),
-      // uploadFileUri(request.backSide.uri),
-    ]);
-
     const formData = new FormData();
     formData.append('file', {
-      uri: frontDataUri,
+      uri: request.frontSide.uri,
       name: request.frontSide.name,
       type: request.frontSide.type,
     } as any);
@@ -63,3 +48,10 @@ export const ekycApi = {
     return {} as OcrCCCDResponse;
   },
 };
+
+export function urimapper(uri: string): string {
+  if (uri.startsWith('file://')) {
+    return uri.replace('file://', '');
+  }
+  return uri;
+}

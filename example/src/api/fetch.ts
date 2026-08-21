@@ -1,6 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import Config from 'react-native-config';
-import type { ApiError, RequestOptions } from './api-type';
+import ReactNativeBlobUtil from 'react-native-blob-util';
+import { ApiError, type RequestOptions } from './api-type';
 export const API_CONFIG = {
   BASE_URL: Config.BASE_URL || 'https://jsonplaceholder.typicode.com',
   TIMEOUT: 30000,
@@ -19,27 +20,135 @@ type ApiErrorResponse = {
   error?: string;
 };
 
-export class ApiRequestError extends Error implements ApiError {
-  status: number;
-  data?: unknown;
-
-  constructor(message: string, status: number, data?: unknown) {
-    super(message);
-    this.name = 'ApiRequestError';
-    this.status = status;
-    this.data = data;
-  }
-}
-
 export const apiClient = axios.create({
   baseURL: API_CONFIG.BASE_URL,
   timeout: API_CONFIG.TIMEOUT,
   headers: API_CONFIG.HEADERS,
 });
 
-// Request Interceptor (Auth Token Injection placeholder)
+export function generateCurlCommand(config: any): string {
+  const method = (config.method || 'GET').toUpperCase();
+  const url = config.baseURL
+    ? `${config.baseURL.replace(/\/$/, '')}/${(config.url || '').replace(/^\//, '')}`
+    : config.url || '';
+
+  const curlParts = [`curl -X ${method} "${url}"`];
+
+  // Extract headers
+  const headers = config.headers
+    ? typeof config.headers.toJSON === 'function'
+      ? config.headers.toJSON()
+      : config.headers
+    : {};
+
+  Object.entries(headers).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    const lowerKey = key.toLowerCase();
+    if (
+      ['common', 'delete', 'get', 'head', 'post', 'put', 'patch'].includes(
+        lowerKey
+      )
+    ) {
+      return;
+    }
+    curlParts.push(`-H "${key}: ${value}"`);
+  });
+
+  // Data/Body
+  if (config.data) {
+    if (
+      config.data instanceof FormData ||
+      (config.data &&
+        typeof config.data === 'object' &&
+        '_parts' in config.data)
+    ) {
+      const parts = (config.data as any)._parts || [];
+      parts.forEach(([key, value]: [string, any]) => {
+        if (value && typeof value === 'object' && value.uri) {
+          // File object in RN FormData
+          const displayUri = value.uri.startsWith('data:')
+            ? `${value.uri.substring(0, 50)}...[truncated base64]...`
+            : value.uri;
+          curlParts.push(
+            `-F "${key}=@${displayUri};type=${value.type || ''};filename=${value.name || ''}"`
+          );
+        } else {
+          // Regular field
+          const strValue =
+            typeof value === 'object' ? JSON.stringify(value) : String(value);
+          curlParts.push(`-F "${key}=${strValue}"`);
+        }
+      });
+    } else {
+      // JSON or text data
+      const dataStr =
+        typeof config.data === 'string'
+          ? config.data
+          : JSON.stringify(config.data);
+      curlParts.push(`-d '${dataStr}'`);
+    }
+  }
+
+  return curlParts.join(' \\\n  ');
+}
+
+export function generateCurlForRNBU(
+  method: string,
+  url: string,
+  headers: any,
+  fields: any[]
+): string {
+  const curlParts = [`curl -X ${method.toUpperCase()} "${url}"`];
+
+  // Headers
+  Object.entries(headers).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    curlParts.push(`-H "${key}: ${value}"`);
+  });
+
+  // Fields (multipart data)
+  fields.forEach((field) => {
+    const name = field.name;
+    const dataVal = field.data;
+
+    // Check if the data is a wrapped file path
+    if (
+      typeof dataVal === 'string' &&
+      (dataVal.startsWith('ReactNativeBlobUtil-file://') ||
+        dataVal.startsWith('RNFetchBlob-file://'))
+    ) {
+      // It's a file path wrapped by RNBU
+      const filePath = dataVal
+        .replace('ReactNativeBlobUtil-file://', '')
+        .replace('RNFetchBlob-file://', '');
+
+      const filename = field.filename || 'file.jpg';
+      const type = field.type || 'image/jpeg';
+      curlParts.push(
+        `-F "${name}=@${filePath};type=${type};filename=${filename}"`
+      );
+    } else if (typeof dataVal === 'string' && dataVal.length > 500) {
+      // Handle fallback/manual base64 if it's there
+      const displayData = `${dataVal.substring(0, 50)}...[truncated base64]...`;
+      curlParts.push(`-F "${name}=${displayData}"`);
+    } else {
+      // Regular field
+      curlParts.push(`-F "${name}=${dataVal}"`);
+    }
+  });
+
+  return curlParts.join(' \\\n  ');
+}
+
+// Request Interceptor (Auth Token Injection placeholder & Curl Logger)
 apiClient.interceptors.request.use((config) => {
   // TODO: Gắn Auth Token từ Host App / Storage nếu có
+  try {
+    const curl = generateCurlCommand(config);
+    console.log('=== CURL REQUEST ===\n' + curl + '\n====================');
+  } catch (error) {
+    console.log('=== CURL GENERATION FAILED ===', error);
+  }
   return config;
 });
 
@@ -71,21 +180,37 @@ function getAxiosErrorMessage(
   return error.message || 'Something went wrong';
 }
 
-export function toApiRequestError(error: unknown): ApiRequestError {
+export function toApiRequestError(error: unknown): ApiError {
   console.log(error);
+  if (error instanceof ApiError) {
+    return error;
+  }
+
   if (axios.isAxiosError<ApiErrorResponse | string>(error)) {
-    return new ApiRequestError(
-      getAxiosErrorMessage(error),
-      error.response?.status ?? 0,
-      error.response?.data
-    );
+    const message = getAxiosErrorMessage(error);
+    const responseData = error.response?.data;
+    let params: Partial<ApiError> = {};
+    if (responseData && typeof responseData === 'object') {
+      const dataObj = responseData as any;
+      params = {
+        error: dataObj.error,
+        statusCode: dataObj.statusCode,
+        errorCode: dataObj.errorCode,
+        errorReason: dataObj.errorReason,
+        toastMessage: dataObj.toastMessage,
+        titleMessage: dataObj.titleMessage,
+        messageType: dataObj.messageType,
+        nextAction: dataObj.nextAction,
+      };
+    }
+    return new ApiError(message, params);
   }
 
   if (error instanceof Error) {
-    return new ApiRequestError(error.message, 0);
+    return new ApiError(error.message);
   }
 
-  return new ApiRequestError('Something went wrong', 0, error);
+  return new ApiError('Something went wrong');
 }
 
 // Response Interceptor (Auto transform Axios error to ApiRequestError)
@@ -133,32 +258,103 @@ export const api = {
     apiRequest<T>(endpoint, { ...options, method: 'DELETE' }),
 
   upload: async <T>(endpoint: string, formData: FormData): Promise<T> => {
-    // const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+    const url = `${API_CONFIG.BASE_URL.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`;
+    console.log('formdata', formData);
     try {
-      const response = await apiClient.post(endpoint, formData);
-      return response.data;
+      const parts = (formData as any)._parts || [];
+      const fields = parts.map(([key, value]: [string, any]) => {
+        if (value && typeof value === 'object' && value.uri) {
+          if (value.uri.startsWith('data:')) {
+            // Base64 Data URI
+            const commaIndex = value.uri.indexOf(',');
+            const base64Data =
+              commaIndex !== -1
+                ? value.uri.substring(commaIndex + 1)
+                : value.uri;
+            return {
+              name: key,
+              filename: value.name || 'file.jpg',
+              type: value.type || 'image/jpeg',
+              data: base64Data,
+            };
+          } else {
+            // Local file URI
+            let path = value.uri;
+            if (path.startsWith('file://')) {
+              path = path.replace('file://', '');
+            }
+            return {
+              name: key,
+              filename: value.name || 'file.jpg',
+              type: value.type || 'image/jpeg',
+              data: ReactNativeBlobUtil.wrap(path),
+            };
+          }
+        } else {
+          // Regular field
+          const strValue =
+            typeof value === 'object' ? JSON.stringify(value) : String(value);
+          return {
+            name: key,
+            data: strValue,
+          };
+        }
+      });
+
+      // Log curl request
+      try {
+        const headersObj = {
+          ...API_CONFIG.HEADERS,
+          'Content-Type': 'multipart/form-data',
+        };
+        const curl = generateCurlForRNBU('POST', url, headersObj, fields);
+        console.log(
+          '=== CURL REQUEST (RNBU) ===\n' + curl + '\n===================='
+        );
+      } catch (error) {
+        console.log('=== CURL GENERATION FAILED ===', error);
+      }
+
+      const response = await ReactNativeBlobUtil.fetch(
+        'POST',
+        url,
+        {
+          ...API_CONFIG.HEADERS,
+          'Content-Type': 'multipart/form-data',
+        },
+        fields
+      );
+
+      const status = response.info().status;
+      const respText = await response.text();
+      console.log(respText);
+      let data: any = null;
+      try {
+        data = JSON.parse(respText);
+      } catch {
+        // no-op
+      }
+
+      if (status < 200 || status >= 300) {
+        let errorMessage = respText;
+        if (data && typeof data === 'object') {
+          errorMessage =
+            data.toastMessage || data.errorReason || data.message || respText;
+        }
+        throw new ApiError(
+          errorMessage,
+          data && typeof data === 'object' ? data : {}
+        );
+      }
+
+      if (data === null) {
+        throw new Error('Response is not a valid JSON: ' + respText);
+      }
+
+      return data as T;
     } catch (error) {
       console.log('=== UPLOAD TEST FAILED ===', error);
-      return {} as T;
+      throw toApiRequestError(error);
     }
   },
 };
-
-/**
- * Chuyển file:// URI thành data: URI (base64) để upload an toàn.
- *
- * Lý do: RN's NetworkingModule (OkHttp) gặp "Stream Closed" khi đọc
- * FileInputStream từ file:// URI. Cách fix: load file vào memory qua
- * fetch(file://...) → Blob → FileReader.readAsDataURL → data: URI.
- * Data URI được NetworkingModule xử lý trực tiếp, không qua FileInputStream.
- */
-export async function uploadFileUri(uri: string): Promise<string> {
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('FileReader: cannot read file'));
-    reader.readAsDataURL(blob);
-  });
-}
