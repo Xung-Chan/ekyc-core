@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Dimensions,
   Linking,
+  NativeEventEmitter,
+  NativeModules,
   Pressable,
   StyleSheet,
   Text,
@@ -25,17 +27,29 @@ import {
   useCameraDevice,
   useCameraFormat,
   useCameraPermission,
+  useFrameProcessor,
 } from 'react-native-vision-camera';
+import { useRunOnJS } from 'react-native-worklets-core';
 
 import { cropCardImageOnly } from '../modules/cardScanner';
 import {
   computeCardScannerGuideRectInPreview,
   computePhotoRawCropRectForCardScan,
+  type ManualPhotoCropPlan,
   type Orientation,
 } from '../modules/photoGuideCropRect';
-import type { CropCardImageOnlyResult, ScanCardResult } from '../type';
+import { scanCardFrame } from '../modules/scanCardFrame';
+import type { ScanCardResult } from '../type';
+import {
+  lBracketPathRoundBottomLeft,
+  lBracketPathRoundBottomRight,
+  lBracketPathRoundTopLeft,
+  lBracketPathRoundTopRight,
+  manualCropOnlyToScanResult,
+} from '../utils/cardScannerHelpers';
 
 const SCREEN = Dimensions.get('window');
+const cardScannerEmitter = new NativeEventEmitter(NativeModules.CardScanner);
 
 const DEFAULT_GUIDE = {
   widthFraction: 0.86,
@@ -46,92 +60,7 @@ const FIGMA_GUIDE_W = 375;
 const FIGMA_HOLE_RX = 10;
 const BRACKET_L_CORNER_RADIUS_PX = 10;
 
-function lBracketPathRoundTopLeft(
-  hx: number,
-  hy: number,
-  brLen: number,
-  filletR: number
-): string {
-  const r = Math.min(filletR, Math.max(0, brLen * 0.48 - 1));
-  if (r < 0.25) {
-    return `M${hx} ${hy + brLen}L${hx} ${hy}L${hx + brLen} ${hy}`;
-  }
-  return `M${hx} ${hy + brLen}L${hx} ${hy + r}A${r} ${r} 0 0 1 ${
-    hx + r
-  } ${hy}L${hx + brLen} ${hy}`;
-}
-
-function lBracketPathRoundTopRight(
-  x1: number,
-  hy: number,
-  brLen: number,
-  filletR: number
-): string {
-  const r = Math.min(filletR, Math.max(0, brLen * 0.48 - 1));
-  if (r < 0.25) {
-    return `M${x1 - brLen} ${hy}L${x1} ${hy}L${x1} ${hy + brLen}`;
-  }
-  return `M${x1 - brLen} ${hy}L${x1 - r} ${hy}A${r} ${r} 0 0 1 ${x1} ${
-    hy + r
-  }L${x1} ${hy + brLen}`;
-}
-
-function lBracketPathRoundBottomLeft(
-  hx: number,
-  y1: number,
-  brLen: number,
-  filletR: number
-): string {
-  const r = Math.min(filletR, Math.max(0, brLen * 0.48 - 1));
-  if (r < 0.25) {
-    return `M${hx} ${y1 - brLen}L${hx} ${y1}L${hx + brLen} ${y1}`;
-  }
-  return `M${hx} ${y1 - brLen}L${hx} ${y1 - r}A${r} ${r} 0 0 0 ${
-    hx + r
-  } ${y1}L${hx + brLen} ${y1}`;
-}
-
-function lBracketPathRoundBottomRight(
-  x1: number,
-  y1: number,
-  brLen: number,
-  filletR: number
-): string {
-  const r = Math.min(filletR, Math.max(0, brLen * 0.48 - 1));
-  if (r < 0.25) {
-    return `M${x1 - brLen} ${y1}L${x1} ${y1}L${x1} ${y1 - brLen}`;
-  }
-  return `M${x1 - brLen} ${y1}L${x1 - r} ${y1}A${r} ${r} 0 0 0 ${x1} ${
-    y1 - r
-  }L${x1} ${y1 - brLen}`;
-}
-
-function manualCropOnlyToScanResult(
-  originalPath: string,
-  expectedSide: 'front' | 'back' | undefined,
-  r: CropCardImageOnlyResult
-): ScanCardResult {
-  return {
-    success: r.success,
-    originalImagePath: r.originalImagePath || originalPath,
-    croppedImagePath: r.croppedImagePath,
-    side: expectedSide ?? 'unknown',
-    sideFrontScore: 0,
-    sideBackScore: 0,
-    quality: {
-      passed: r.success,
-      blurScore: 0,
-      motionScore: 0,
-      glareScore: 0,
-      exposure: 'ok',
-      reasons: r.success ? [] : [r.errorCode ?? 'CROP_FAILED'],
-    },
-    appliedCrop: r.appliedCrop,
-    manualCaptureDebugSavedToGallery: r.debugSavedToGallery,
-    errorCode: r.errorCode,
-    errorMessage: r.errorMessage,
-  };
-}
+// Helper functions moved to cardScannerHelpers.ts
 
 export type CardScannerCameraViewGuideConfig = {
   widthFraction?: number;
@@ -140,16 +69,17 @@ export type CardScannerCameraViewGuideConfig = {
 
 export interface CardScannerCameraViewProps {
   isActive?: boolean;
+  autocapture?: boolean;
   targetFps?: number;
   guideFrame?: CardScannerCameraViewGuideConfig;
   expectedSide?: 'front' | 'back';
-  onPhotoCaptured?: (imagePath: string, scanResult: ScanCardResult) => void;
   style?: ViewStyle;
-  children?: React.ReactNode;
   showGuide?: boolean;
-  onRetry?: () => void;
+  children?: React.ReactNode;
+  onPhotoCaptured?: (imagePath: string, scanResult: ScanCardResult) => void;
 }
 export interface CardScannerCameraInnerProps extends CardScannerCameraViewProps {
+  onRetry: () => void;
   onAutoRetry: () => void;
 }
 
@@ -169,13 +99,14 @@ const CardScannerCameraInner = forwardRef<
   (
     {
       isActive = true,
+      autocapture = false,
       targetFps = 24,
-      guideFrame: guideCfg = {},
+      guideFrame: guideCfg = DEFAULT_GUIDE,
       expectedSide,
-      onPhotoCaptured,
       style,
       children,
       showGuide = true,
+      onPhotoCaptured,
       onRetry,
       onAutoRetry,
     },
@@ -193,26 +124,6 @@ const CardScannerCameraInner = forwardRef<
     const [busy, setBusy] = useState(false);
     const captureLockRef = useRef(false);
     const [isTimeout, setIsTimeout] = useState(false);
-
-    useEffect(() => {
-      if (device != null) {
-        setIsTimeout(false);
-        return undefined;
-      }
-
-      const retryTimer = setTimeout(() => {
-        onAutoRetry();
-      }, 500);
-
-      const timeoutTimer = setTimeout(() => {
-        setIsTimeout(true);
-      }, 3000);
-
-      return () => {
-        clearTimeout(retryTimer);
-        clearTimeout(timeoutTimer);
-      };
-    }, [device, onAutoRetry]);
 
     const [previewSize, setPreviewSize] = useState({
       width: SCREEN.width,
@@ -239,6 +150,114 @@ const CardScannerCameraInner = forwardRef<
         guideCfg.aspectRatio,
       ]
     );
+
+    const [isDocDetected, setIsDocDetected] = useState(false);
+
+    const updateDocDetected = useRunOnJS((detected: boolean) => {
+      setIsDocDetected(detected);
+    }, []);
+
+    useEffect(() => {
+      if (!autocapture || !isActive) {
+        setIsDocDetected(false);
+        return undefined;
+      }
+
+      const subscriptionCapture = cardScannerEmitter.addListener(
+        'onCardCaptured',
+        async (event) => {
+          if (busy || captureLockRef.current) return;
+
+          if (event.success && event.croppedImagePath) {
+            captureLockRef.current = true;
+            setBusy(true);
+            const scanResult: ScanCardResult = {
+              success: true,
+              originalImagePath: event.croppedImagePath,
+              croppedImagePath: event.croppedImagePath,
+              side: expectedSide ?? 'unknown',
+              sideFrontScore: 1.0,
+              sideBackScore: 0.0,
+              quality: {
+                passed: true,
+                blurScore: event.blurScore ?? 0.0,
+                motionScore: 0.0,
+                glareScore: (event.glarePercent ?? 0.0) * 100,
+                exposure: 'ok',
+                reasons: [],
+              },
+              appliedCrop: event.appliedCrop
+                ? {
+                    x: event.appliedCrop.x,
+                    y: event.appliedCrop.y,
+                    width: event.appliedCrop.width,
+                    height: event.appliedCrop.height,
+                  }
+                : undefined,
+              manualCaptureDebugSavedToGallery: false,
+            };
+            await onPhotoCaptured?.(event.croppedImagePath, scanResult);
+            captureLockRef.current = false;
+            setBusy(false);
+          }
+        }
+      );
+
+      return () => {
+        subscriptionCapture.remove();
+      };
+    }, [autocapture, isActive, expectedSide, onPhotoCaptured, busy]);
+
+    const frameProcessor = useFrameProcessor(
+      (frame) => {
+        'worklet';
+        if (busy || captureLockRef.current) {
+          updateDocDetected(false);
+          return;
+        }
+
+        const result = scanCardFrame(frame, {
+          previewWidth: previewSize.width,
+          previewHeight: previewSize.height,
+          guideX: overlayGuide.x,
+          guideY: overlayGuide.y,
+          guideWidth: overlayGuide.width,
+          guideHeight: overlayGuide.height,
+          bufferOrientation: frame.orientation,
+          throttleMs: 150,
+          blurThreshold: 150.0,
+          glareThreshold: 0.05,
+        });
+
+        if (result) {
+          updateDocDetected(result.isDocumentPresent);
+        } else {
+          updateDocDetected(false);
+        }
+      },
+      [previewSize, overlayGuide, busy, updateDocDetected]
+    );
+
+    useEffect(() => {
+      if (device != null) {
+        setIsTimeout(false);
+        return undefined;
+      }
+
+      const retryTimer = setTimeout(() => {
+        //re-mount lại component
+        onAutoRetry();
+      }, 500);
+
+      const timeoutTimer = setTimeout(() => {
+        setIsTimeout(true);
+      }, 3000);
+
+      return () => {
+        clearTimeout(retryTimer);
+        clearTimeout(timeoutTimer);
+      };
+    }, [device, onAutoRetry]);
 
     const guideFrameStyle = useMemo(() => {
       if (overlayGuide.width > 0.5 && overlayGuide.height > 0.5) {
@@ -310,14 +329,15 @@ const CardScannerCameraInner = forwardRef<
           ? photo.path
           : `file://${photo.path}`;
 
-        const cropPlan = computePhotoRawCropRectForCardScan({
-          previewSize,
-          guideFrame: overlayGuide,
-          photoWidth: photo.width,
-          photoHeight: photo.height,
-          photoOrientation: photo.orientation as Orientation,
-          previewContentMode: 'cover',
-        });
+        const cropPlan: ManualPhotoCropPlan =
+          computePhotoRawCropRectForCardScan({
+            previewSize,
+            guideFrame: overlayGuide,
+            photoWidth: photo.width,
+            photoHeight: photo.height,
+            photoOrientation: photo.orientation as Orientation,
+            previewContentMode: 'cover',
+          });
 
         const cropResult = await cropCardImageOnly({
           imagePath: path,
@@ -326,6 +346,7 @@ const CardScannerCameraInner = forwardRef<
           bufferOrientation: cropPlan.bufferOrientation,
           sourcePhotoWidth: cropPlan.sourcePhotoWidth,
           sourcePhotoHeight: cropPlan.sourcePhotoHeight,
+          manualCaptureDebugSaveToGallery: true,
         });
 
         const scanResult = manualCropOnlyToScanResult(
@@ -336,7 +357,7 @@ const CardScannerCameraInner = forwardRef<
         const returnedPath = cropResult.croppedImagePath || path;
 
         // Callback is invoked; no local preview image state is set in the SDK component
-        await onPhotoCaptured?.(returnedPath, scanResult);
+        onPhotoCaptured?.(returnedPath, scanResult);
         return returnedPath;
       } catch (e) {
         console.error(
@@ -357,11 +378,13 @@ const CardScannerCameraInner = forwardRef<
     const start = useCallback(() => {
       captureLockRef.current = false;
       setBusy(false);
+      setIsDocDetected(false);
     }, []);
 
     const reset = useCallback(() => {
       captureLockRef.current = false;
       setBusy(false);
+      setIsDocDetected(false);
     }, []);
 
     useImperativeHandle(
@@ -400,6 +423,8 @@ const CardScannerCameraInner = forwardRef<
       );
     }
 
+    const strokeColor = isDocDetected ? '#4CD964' : '#ffffff';
+
     return (
       <View style={[styles.root, style]}>
         <View style={styles.preview} onLayout={onPreviewLayout}>
@@ -414,6 +439,7 @@ const CardScannerCameraInner = forwardRef<
             fps={targetFps}
             resizeMode="cover"
             enableZoomGesture={false}
+            frameProcessor={autocapture ? frameProcessor : undefined}
           />
 
           {showGuide && figmaGuideOverlayGeom && figmaBracketPaths && (
@@ -455,25 +481,25 @@ const CardScannerCameraInner = forwardRef<
 
                 <Path
                   d={figmaBracketPaths.tl}
-                  stroke="#ffffff"
+                  stroke={strokeColor}
                   strokeWidth={3}
                   fill="none"
                 />
                 <Path
                   d={figmaBracketPaths.tr}
-                  stroke="#ffffff"
+                  stroke={strokeColor}
                   strokeWidth={3}
                   fill="none"
                 />
                 <Path
                   d={figmaBracketPaths.bl}
-                  stroke="#ffffff"
+                  stroke={strokeColor}
                   strokeWidth={3}
                   fill="none"
                 />
                 <Path
                   d={figmaBracketPaths.br}
-                  stroke="#ffffff"
+                  stroke={strokeColor}
                   strokeWidth={3}
                   fill="none"
                 />

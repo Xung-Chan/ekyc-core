@@ -54,6 +54,8 @@ export interface Spec extends TurboModule {
   ): Promise<CropCardImageOnlyResult>;
   deleteLocalImages(paths: string[]): Promise<CleanUpResult>;
   scrubCardScannerTempFiles(exclude: string[] | null): Promise<CleanUpResult>;
+  addListener(eventName: string): void;
+  removeListeners(count: number): void;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('CardScanner');

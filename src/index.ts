@@ -7,3 +7,4 @@ export {
 export * from './components';
 export * from './type';
 export * from './modules/photoGuideCropRect';
+export { scanCardFrame } from './modules/scanCardFrame';

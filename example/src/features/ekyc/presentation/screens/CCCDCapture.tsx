@@ -80,6 +80,7 @@ export default function CCCDCapture() {
           isActive={true}
           expectedSide={currentSide}
           onPhotoCaptured={handlePhotoCaptured}
+          autocapture={false}
         />
       </View>
 

@@ -4212,6 +4212,7 @@ __metadata:
     react-native-svg: "npm:^15.12.0"
     react-native-vision-camera: "npm:4.7.0"
     react-native-web: "npm:~0.21.2"
+    react-native-worklets-core: "npm:*"
     react-redux: "npm:^9.3.0"
     redux-saga: "npm:^1.5.1"
     vite: "npm:^7.1.1"
@@ -4248,6 +4249,7 @@ __metadata:
     react-native-svg: "npm:^15.12.0"
     react-native-vision-camera: "npm:4.7.0"
     react-native-web: "npm:~0.21.2"
+    react-native-worklets-core: "npm:*"
     release-it: "npm:^20.2.0"
     turbo: "npm:^2.9.16"
     typescript: "npm:^6.0.3"
@@ -10914,6 +10916,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-worklets-core@npm:*":
+  version: 1.6.3
+  resolution: "react-native-worklets-core@npm:1.6.3"
+  dependencies:
+    string-hash-64: "npm:^1.0.3"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 10c0/712011f611cca7e982e1d776d8219b03092ea0bfe468d77da1d03b2c5513eb545ad004b550f88deee2c1e325a902c5a5117c325e6a5827bbbb659b012ced6011
+  languageName: node
+  linkType: hard
+
 "react-native@npm:0.85.0":
   version: 0.85.0
   resolution: "react-native@npm:0.85.0"
@@ -11927,6 +11941,13 @@ __metadata:
   version: 2.0.0
   resolution: "strict-uri-encode@npm:2.0.0"
   checksum: 10c0/010cbc78da0e2cf833b0f5dc769e21ae74cdc5d5f5bd555f14a4a4876c8ad2c85ab8b5bdf9a722dc71a11dcd3184085e1c3c0bd50ec6bb85fffc0f28cf82597d
+  languageName: node
+  linkType: hard
+
+"string-hash-64@npm:^1.0.3":
+  version: 1.0.3
+  resolution: "string-hash-64@npm:1.0.3"
+  checksum: 10c0/ac175f71b383af1487ab16b4cc1b42b5302bea08bdf1cc1ea04bacb293fb9b35afc6c58260e1fc728627e7265519da01976822a188d493d7e7625b9628173ea3
   languageName: node
   linkType: hard
 

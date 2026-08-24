@@ -1,6 +1,5 @@
 package com.ekyccore.cardscanner
 
-import android.net.Uri
 import com.ekyccore.NativeCardScannerSpec
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -10,360 +9,274 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
-import java.io.File
-import java.util.concurrent.Executors
+import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.mrousavy.camera.frameprocessors.FrameProcessorPluginRegistry
 
 @ReactModule(name = CardScannerModule.NAME)
 class CardScannerModule(private val reactContext: ReactApplicationContext) :
-  NativeCardScannerSpec(reactContext) {
+    NativeCardScannerSpec(reactContext), CardScannerManager.CardScannerEventListener {
+    //todo dependency injection
+    private val manager = CardScannerManager.getInstance(reactContext)
 
-  private val executor = Executors.newSingleThreadExecutor()
+    //todo using for auto capture
+    init {
+        manager.setEventListener(this)
 
-  private val pipeline by lazy { CardScannerPipelineHolder.get(reactContext) }
-
-  override fun getName(): String = NAME
-
-  companion object {
-    const val NAME = "CardScanner"
-
-    private val TEMP_FILE_PREFIXES =
-      arrayOf(
-        "card_manual_crop_",
-        "card_scan_",
-        "ekyc_card_warp_",
-        "img_cmp_",
-        "img_src_",
-      )
-  }
-
-  override fun cropCardImageOnly(params: ReadableMap, promise: Promise?) {
-    val imagePath = if (params.hasKey("imagePath")) params.getString("imagePath") else null
-    val cropMap = if (params.hasKey("crop")) params.getMap("crop") else null
-    if (imagePath.isNullOrBlank() || cropMap == null) {
-      promise?.resolve(
-        buildCropOnlyError(
-          imagePath ?: "",
-          "INVALID_INPUT",
-          "imagePath and crop are required",
-        ),
-      )
-      return
-    }
-    val cx = readCropCoord(cropMap, "x")
-    val cy = readCropCoord(cropMap, "y")
-    val cw = readBufferDimension(cropMap, "width")
-    val ch = readBufferDimension(cropMap, "height")
-    if (cw <= 0 || ch <= 0) {
-      promise?.resolve(
-        buildCropOnlyError(
-          imagePath,
-          "INVALID_INPUT",
-          "crop.width and crop.height must be positive",
-        ),
-      )
-      return
-    }
-    val debugGallery = readOptionalBool(params, "manualCaptureDebugSaveToGallery")
-    val cropCoordinateSpace =
-      if (params.hasKey("cropCoordinateSpace")) {
-        params.getString("cropCoordinateSpace") ?: "raw"
-      } else {
-        "raw"
-      }
-    val bufferOrientation =
-      if (params.hasKey("bufferOrientation")) params.getString("bufferOrientation") else null
-    val sourcePhotoW = readBufferDimension(params, "sourcePhotoWidth")
-    val sourcePhotoH = readBufferDimension(params, "sourcePhotoHeight")
-
-    executor.execute {
-      try {
-        val r =
-          pipeline.cropJpegOnly(
-            imagePath,
-            cx,
-            cy,
-            cw,
-            ch,
-            cropCoordinateSpace,
-            bufferOrientation,
-            sourcePhotoW,
-            sourcePhotoH,
-          )
-        if (!r.success) {
-          promise?.resolve(
-            Arguments.createMap().apply {
-              putBoolean("success", false)
-              putString("originalImagePath", imagePath)
-              putBoolean("debugSavedToGallery", false)
-              putString("errorCode", r.errorCode ?: "CROP_FAILED")
-              putString("errorMessage", r.errorMessage ?: "Crop failed")
-              putManualCropDebug(this, r)
-            },
-          )
-          return@execute
+        // Register custom Frame Processor Plugin
+        FrameProcessorPluginRegistry.addFrameProcessorPlugin("scanCardFrame") { proxy, options ->
+            CardScannerFrameProcessorPlugin(proxy, options)
         }
-        val croppedAbs = r.croppedAbsolutePath!!
-        var debugSaved = false
-        if (debugGallery) {
-          debugSaved =
-            ManualCardCaptureDebugSaver.saveFullAndOutline(
-              reactContext.applicationContext,
-              imagePath,
-              r.appliedX,
-              r.appliedY,
-              r.appliedW,
-              r.appliedH,
-            )
-        }
-        promise?.resolve(
-          Arguments.createMap().apply {
-            putBoolean("success", true)
-            putString("originalImagePath", imagePath)
-            putString("croppedImagePath", "file://$croppedAbs")
-            putMap(
-              "appliedCrop",
-              Arguments.createMap().apply {
-                putInt("x", r.appliedX)
-                putInt("y", r.appliedY)
-                putInt("width", r.appliedW)
-                putInt("height", r.appliedH)
-              },
-            )
-            putBoolean("debugSavedToGallery", debugSaved)
-            putManualCropDebug(this, r)
-          },
-        )
-      } catch (e: Throwable) {
-        promise?.resolve(
-          buildCropOnlyError(
-            imagePath,
-            "PIPELINE_ERROR",
-            e.message ?: e.toString(),
-          ),
-        )
-      }
     }
-  }
 
-  override fun deleteLocalImages(paths: ReadableArray, promise: Promise?) {
-    executor.execute {
-      try {
-        var deleted = 0
-        var skipped = 0
+    override fun getName(): String = NAME
+
+    companion object {
+        const val NAME = "CardScanner"
+    }
+
+    override fun cropCardImageOnly(params: ReadableMap, promise: Promise?) {
+        val dto = CropCardImageOnlyParams.fromReadableMap(params)
+        val imagePath = dto.imagePath
+        val crop = dto.crop
+
+        if (imagePath.isBlank() || crop == null) {
+            promise?.resolve(
+                buildCropOnlyError(
+                    imagePath,
+                    "INVALID_INPUT",
+                    "imagePath and crop are required",
+                ),
+            )
+            return
+        }
+
+        if (crop.width <= 0 || crop.height <= 0) {
+            promise?.resolve(
+                buildCropOnlyError(
+                    imagePath,
+                    "INVALID_INPUT",
+                    "crop.width and crop.height must be positive",
+                ),
+            )
+            return
+        }
+
+        manager.cropCardImage(
+            imagePath = imagePath,
+            cx = crop.x,
+            cy = crop.y,
+            cw = crop.width,
+            ch = crop.height,
+            cropCoordinateSpace = dto.cropCoordinateSpace,
+            bufferOrientation = dto.bufferOrientation,
+            sourcePhotoW = dto.sourcePhotoWidth,
+            sourcePhotoH = dto.sourcePhotoHeight,
+            debugGallery = dto.manualCaptureDebugSaveToGallery,
+            callback = object : CardScannerManager.CropCallback {
+                override fun onSuccess(result: Map<String, Any>) {
+                    promise?.resolve(mapToWritableMap(result))
+                }
+
+                override fun onFailure(errorCode: String, errorMessage: String, debugDetails: Map<String, Any>?) {
+                    promise?.resolve(
+                        Arguments.createMap().apply {
+                            putBoolean("success", false)
+                            putString("originalImagePath", imagePath)
+                            putBoolean("debugSavedToGallery", false)
+                            putString("errorCode", errorCode)
+                            putString("errorMessage", errorMessage)
+                            debugDetails?.let { putMap("cropDebug", mapToWritableMap(it)) }
+                        }
+                    )
+                }
+            }
+        )
+    }
+
+    override fun deleteLocalImages(paths: ReadableArray, promise: Promise?) {
+        val list = ArrayList<String>()
         for (i in 0 until paths.size()) {
-          val raw =
             try {
-              paths.getString(i)
+                paths.getString(i)?.let { list.add(it) }
             } catch (_: Throwable) {
-              null
             }
-          if (raw.isNullOrBlank()) {
-            skipped++
-            continue
-          }
-          when (unlinkAllowedPath(raw)) {
-            true -> deleted++
-            false -> skipped++
-          }
         }
-        promise?.resolve(
-          Arguments.createMap().apply {
-            putInt("deleted", deleted)
-            putInt("skipped", skipped)
-          },
-        )
-      } catch (e: Throwable) {
-        promise?.reject("DELETE_LOCAL_IMAGES_FAILED", e.message ?: e.toString(), e)
-      }
-    }
-  }
 
-  override fun scrubCardScannerTempFiles(exclude: ReadableArray?, promise: Promise?) {
-    executor.execute {
-      try {
-        val excludeSet = HashSet<String>()
-        if (exclude != null) {
-          for (i in 0 until exclude.size()) {
-            val raw =
-              try {
-                exclude.getString(i)
-              } catch (_: Throwable) {
-                null
-              }
-            val norm = normalizeFsPath(raw)
-            if (norm != null) {
-              excludeSet.add(norm)
+        manager.deleteLocalImages(list, object : CardScannerManager.CleanupCallback {
+            override fun onSuccess(deleted: Int, skipped: Int) {
+                promise?.resolve(
+                    Arguments.createMap().apply {
+                        putInt("deleted", deleted)
+                        putInt("skipped", skipped)
+                    }
+                )
             }
-          }
+
+            override fun onFailure(throwable: Throwable) {
+                promise?.reject("DELETE_LOCAL_IMAGES_FAILED", throwable.message ?: throwable.toString(), throwable)
+            }
+        })
+    }
+
+    override fun scrubCardScannerTempFiles(exclude: ReadableArray?, promise: Promise?) {
+        val excludeList = exclude?.let {
+            val list = ArrayList<String>()
+            for (i in 0 until it.size()) {
+                try {
+                    it.getString(i)?.let { s -> list.add(s) }
+                } catch (_: Throwable) {
+                }
+            }
+            list
         }
-        var deleted = 0
-        var skipped = 0
-        for (root in allowedTempRoots()) {
-          val files = root.listFiles() ?: continue
-          for (file in files) {
-            if (!file.isFile) {
-              skipped++
-              continue
+
+        manager.scrubCardScannerTempFiles(excludeList, object : CardScannerManager.CleanupCallback {
+            override fun onSuccess(deleted: Int, skipped: Int) {
+                promise?.resolve(
+                    Arguments.createMap().apply {
+                        putInt("deleted", deleted)
+                        putInt("skipped", skipped)
+                    }
+                )
             }
-            val name = file.name
-            if (TEMP_FILE_PREFIXES.none { name.startsWith(it) }) {
-              continue
+
+            override fun onFailure(throwable: Throwable) {
+                promise?.reject("SCRUB_TEMP_FILES_FAILED", throwable.message ?: throwable.toString(), throwable)
             }
-            val canon =
-              try {
-                file.canonicalPath
-              } catch (_: Throwable) {
-                skipped++
-                continue
-              }
-            if (excludeSet.contains(canon)) {
-              skipped++
-              continue
-            }
-            if (file.delete()) {
-              deleted++
-            } else {
-              skipped++
-            }
-          }
+        })
+    }
+
+    override fun addListener(eventName: String?) {
+        // Required for NativeEventEmitter
+    }
+
+    override fun removeListeners(count: Double) {
+        // Required for NativeEventEmitter
+    }
+
+    // --- CardScannerEventListener Callbacks ---
+
+    override fun onCardCaptured(
+        croppedImagePath: String,
+        blurScore: Double,
+        glarePercent: Double,
+        appliedX: Int,
+        appliedY: Int,
+        appliedWidth: Int,
+        appliedHeight: Int
+    ) {
+        val event = Arguments.createMap().apply {
+            putBoolean("success", true)
+            putString("croppedImagePath", croppedImagePath)
+            putDouble("blurScore", blurScore)
+            putDouble("glarePercent", glarePercent)
+            putMap("appliedCrop", Arguments.createMap().apply {
+                putInt("x", appliedX)
+                putInt("y", appliedY)
+                putInt("width", appliedWidth)
+                putInt("height", appliedHeight)
+            })
         }
-        promise?.resolve(
-          Arguments.createMap().apply {
-            putInt("deleted", deleted)
-            putInt("skipped", skipped)
-          },
-        )
-      } catch (e: Throwable) {
-        promise?.reject("SCRUB_TEMP_FILES_FAILED", e.message ?: e.toString(), e)
-      }
+        sendEvent("onCardCaptured", event)
     }
-  }
 
-  private fun allowedTempRoots(): List<File> {
-    val ctx = reactContext
-    return listOfNotNull(ctx.cacheDir, ctx.codeCacheDir, ctx.externalCacheDir)
-  }
-
-  private fun normalizeFsPath(raw: String?): String? {
-    if (raw.isNullOrBlank()) return null
-    var p = raw.trim()
-    if (p.startsWith("file://")) {
-      p = Uri.parse(p).path ?: p.removePrefix("file://")
+    override fun onCardCaptureFailed(errorCode: String, errorMessage: String) {
+        val event = Arguments.createMap().apply {
+            putBoolean("success", false)
+            putString("errorCode", errorCode)
+            putString("errorMessage", errorMessage)
+        }
+        sendEvent("onCardCaptured", event)
     }
-    return try {
-      File(p).canonicalPath
-    } catch (_: Throwable) {
-      null
-    }
-  }
 
-  private fun isUnderAllowedRoot(file: File): Boolean {
-    val path =
-      try {
-        file.canonicalPath
-      } catch (_: Throwable) {
-        return false
-      }
-    return allowedTempRoots().any { root ->
-      val r =
-        try {
-          root.canonicalPath
+    // --- Helper Methods ---
+
+    private fun sendEvent(eventName: String, params: WritableMap?) {
+        if (reactApplicationContext.hasActiveReactInstance()) {
+            reactApplicationContext
+                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                .emit(eventName, params)
+        }
+    }
+
+    private fun buildCropOnlyError(path: String, code: String, message: String) =
+        Arguments.createMap().apply {
+            putBoolean("success", false)
+            putString("originalImagePath", path)
+            putBoolean("debugSavedToGallery", false)
+            putString("errorCode", code)
+            putString("errorMessage", message)
+        }
+
+    private fun readCropCoord(m: ReadableMap, key: String): Int {
+        if (!m.hasKey(key)) return 0
+        return try {
+            when (m.getType(key)) {
+                ReadableType.Number -> m.getDouble(key).toInt()
+                else -> m.getInt(key)
+            }
         } catch (_: Throwable) {
-          return@any false
+            0
         }
-      path == r || path.startsWith(r + File.separator)
     }
-  }
 
-  private fun unlinkAllowedPath(raw: String): Boolean {
-    val norm = normalizeFsPath(raw) ?: return false
-    val file = File(norm)
-    if (!file.exists()) return false
-    if (!file.isFile) return false
-    if (!isUnderAllowedRoot(file)) return false
-    return file.delete()
-  }
-
-  private fun readCropCoord(m: ReadableMap, key: String): Int {
-    if (!m.hasKey(key)) return 0
-    return try {
-      when (m.getType(key)) {
-        ReadableType.Number -> m.getDouble(key).toInt()
-        else -> m.getInt(key)
-      }
-    } catch (_: Throwable) {
-      0
+    private fun readOptionalBool(params: ReadableMap, key: String): Boolean {
+        if (!params.hasKey(key)) return false
+        return try {
+            when (params.getType(key)) {
+                ReadableType.Boolean -> params.getBoolean(key)
+                else -> false
+            }
+        } catch (_: Throwable) {
+            false
+        }
     }
-  }
 
-  private fun readOptionalBool(params: ReadableMap, key: String): Boolean {
-    if (!params.hasKey(key)) return false
-    return try {
-      when (params.getType(key)) {
-        ReadableType.Boolean -> params.getBoolean(key)
-        else -> false
-      }
-    } catch (_: Throwable) {
-      false
+    private fun readBufferDimension(params: ReadableMap, key: String): Int {
+        if (!params.hasKey(key)) return 0
+        return try {
+            when (params.getType(key)) {
+                ReadableType.Number -> {
+                    val v = params.getDouble(key)
+                    if (!v.isFinite() || v < 1) 0 else v.toInt().coerceIn(1, 8192)
+                }
+
+                else -> params.getInt(key).coerceAtLeast(0)
+            }
+        } catch (_: Throwable) {
+            0
+        }
     }
-  }
 
-  private fun readBufferDimension(params: ReadableMap, key: String): Int {
-    if (!params.hasKey(key)) return 0
-    return try {
-      when (params.getType(key)) {
-        ReadableType.Number -> {
-          val v = params.getDouble(key)
-          if (!v.isFinite() || v < 1) 0 else v.toInt().coerceIn(1, 8192)
+    @Suppress("UNCHECKED_CAST")
+    private fun mapToWritableMap(map: Map<String, Any?>): WritableMap {
+        val writable = Arguments.createMap()
+        for ((key, value) in map) {
+            when (value) {
+                null -> writable.putNull(key)
+                is Boolean -> writable.putBoolean(key, value)
+                is Int -> writable.putInt(key, value)
+                is Double -> writable.putDouble(key, value)
+                is Float -> writable.putDouble(key, value.toDouble())
+                is Long -> writable.putDouble(key, value.toDouble())
+                is String -> writable.putString(key, value)
+                is Map<*, *> -> writable.putMap(key, mapToWritableMap(value as Map<String, Any?>))
+                is List<*> -> {
+                    val array = Arguments.createArray()
+                    for (item in value) {
+                        when (item) {
+                            null -> array.pushNull()
+                            is Boolean -> array.pushBoolean(item)
+                            is Int -> array.pushInt(item)
+                            is Double -> array.pushDouble(item)
+                            is String -> array.pushString(item)
+                            is Map<*, *> -> array.pushMap(mapToWritableMap(item as Map<String, Any?>))
+                        }
+                    }
+                    writable.putArray(key, array)
+                }
+            }
         }
-        else -> params.getInt(key).coerceAtLeast(0)
-      }
-    } catch (_: Throwable) {
-      0
-    }
-  }
-
-  private fun putManualCropDebug(
-    parent: WritableMap,
-    r: CardScannerPipeline.CropJpegOnlyResult,
-  ) {
-    parent.putMap(
-      "cropDebug",
-      Arguments.createMap().apply {
-        putString("cropCoordinateSpace", r.debugCropCoordinateSpace)
-        putInt("decodedWidth", r.debugDecodedWidth)
-        putInt("decodedHeight", r.debugDecodedHeight)
-        if (r.debugExifOrientation != null) {
-          putInt("exifOrientation", r.debugExifOrientation)
-        }
-        if (r.debugNormalizedWidth != null) {
-          putInt("normalizedWidth", r.debugNormalizedWidth)
-        }
-        if (r.debugNormalizedHeight != null) {
-          putInt("normalizedHeight", r.debugNormalizedHeight)
-        }
-        if (r.debugBufferOrientation != null) {
-          putString("bufferOrientation", r.debugBufferOrientation)
-        }
-        r.debugExpectedUprightWidth?.let { putInt("expectedUprightWidth", it) }
-        r.debugExpectedUprightHeight?.let { putInt("expectedUprightHeight", it) }
-        putBoolean("skippedUprightRotation", r.debugSkippedUprightRotation)
-        if (r.debugSourcePhotoWidth > 0) {
-          putInt("sourcePhotoWidth", r.debugSourcePhotoWidth)
-        }
-        if (r.debugSourcePhotoHeight > 0) {
-          putInt("sourcePhotoHeight", r.debugSourcePhotoHeight)
-        }
-      },
-    )
-  }
-
-  private fun buildCropOnlyError(path: String, code: String, message: String) =
-    Arguments.createMap().apply {
-      putBoolean("success", false)
-      putString("originalImagePath", path)
-      putBoolean("debugSavedToGallery", false)
-      putString("errorCode", code)
-      putString("errorMessage", message)
+        return writable
     }
 }
