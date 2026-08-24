@@ -1,6 +1,6 @@
 {
   "name": "@xungchan/ekyc-core",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "sdk register and verify ekyc",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/index.d.ts",
