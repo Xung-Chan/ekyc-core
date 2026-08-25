@@ -146,16 +146,35 @@ class CardScannerManager private constructor(private val context: Context) {
         var corners: Array<org.opencv.core.Point>? = null
         if (bestContour != null && maxArea > (mat.cols() * mat.rows() * 0.10)) {
             val mop2f = org.opencv.core.MatOfPoint2f(*bestContour.toArray())
-            val approx = org.opencv.core.MatOfPoint2f()
-            val peri = Imgproc.arcLength(mop2f, true)
-            Imgproc.approxPolyDP(mop2f, approx, 0.02 * peri, true)
+            
+            // 1. Dùng RotatedRect (minAreaRect) để lấy khung bao hình chữ nhật xoay tối ưu (luôn có 4 đỉnh)
+            val minRect = Imgproc.minAreaRect(mop2f)
+            val rectWidth = minRect.size.width
+            val rectHeight = minRect.size.height
+            val longSide = maxOf(rectWidth, rectHeight)
+            val shortSide = minOf(rectWidth, rectHeight)
 
-            val approxArray = approx.toArray()
-            if (approxArray.size == 4) {
-                corners = approxArray
+            if (shortSide > 0) {
+                val aspectRatio = longSide / shortSide
+                // Tỷ lệ chuẩn của thẻ ID card là ~1.586. Cho phép khoảng sai số rộng [1.2, 2.1] để bù trừ góc nghiêng phối cảnh
+                val isCardAspectRatio = aspectRatio in 1.2..2.1
+                
+                // 3. Tính độ lấp đầy (Solidity / Rectangularity) để loại bỏ nhiễu ngẫu nhiên không phải hình hộp
+                val rectArea = rectWidth * rectHeight
+                val rectangularity = if (rectArea > 0) maxArea / rectArea else 0.0
+                
+                // Độ lấp đầy đối với thẻ ID thật thường >= 0.70 (do bo góc tròn và ngón tay che nhẹ)
+                val isRectangularEnough = rectangularity >= 0.70
+                
+                if (isCardAspectRatio && isRectangularEnough) {
+                    val pts = Array(4) { org.opencv.core.Point() }
+                    minRect.points(pts)
+                    corners = pts
+                } else {
+                    Log.d(LOG_TAG, "detectCardCorners: failed criteria: aspect=$aspectRatio (ok=$isCardAspectRatio), rectangularity=$rectangularity (ok=$isRectangularEnough)")
+                }
             }
             mop2f.release()
-            approx.release()
         }
 
         gray.release()
@@ -790,11 +809,14 @@ class CardScannerManager private constructor(private val context: Context) {
             return false
         }
 
-        val margin = 3.0
+        // Nới lỏng biên kiểm định sang biên âm (ngoài vùng crop) tối đa 15 pixel
+        // giúp tránh lỗi khi MinAreaRect hơi mở rộng ra ngoài một chút do bo tròn góc hoặc nhiễu viền
+        val marginX = -15.0
+        val marginY = -15.0
         val W = mat.cols().toDouble()
         val H = mat.rows().toDouble()
         for (pt in corners) {
-            if (pt.x <= margin || pt.x >= (W - margin) || pt.y <= margin || pt.y >= (H - margin)) {
+            if (pt.x <= marginX || pt.x >= (W - marginX) || pt.y <= marginY || pt.y >= (H - marginY)) {
                 Log.i(LOG_TAG, "isDocumentPresent: failed because corner is clipped by margin: x=${pt.x}, y=${pt.y}, W=$W, H=$H")
                 return false
             }
