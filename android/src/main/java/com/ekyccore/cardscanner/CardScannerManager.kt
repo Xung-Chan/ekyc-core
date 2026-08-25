@@ -1,9 +1,14 @@
 package com.ekyccore.cardscanner
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Log
 import androidx.exifinterface.media.ExifInterface
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import org.opencv.android.OpenCVLoader
 import org.opencv.core.Core
 import org.opencv.core.CvType
@@ -16,6 +21,7 @@ import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.Executors
+import kotlin.getValue
 import kotlin.math.max
 
 class CardScannerManager private constructor(private val context: Context) {
@@ -26,6 +32,183 @@ class CardScannerManager private constructor(private val context: Context) {
     private var openCvReady = false
     private var eventListener: CardScannerEventListener? = null
     private var lastProcessedTimestamp = 0L
+
+    private val recognizer by lazy {
+        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    }
+
+    @Volatile
+    var currentFrameIndex = 0L
+        private set
+
+    @Volatile
+    var lastOcrExecutionTime = 0L
+
+    private var lastSuccessfulScanTime = 0L
+    private var cachedSide: String? = null
+    private var cachedFrontScore = 0.0
+    private var cachedBackScore = 0.0
+    private var cachedImagePath: String? = null
+    private var cachedBlurScore = 0.0
+    private var cachedGlarePercent = 0.0
+    private var cachedAppliedX = 0
+    private var cachedAppliedY = 0
+    private var cachedAppliedW = 0
+    private var cachedAppliedH = 0
+
+    private var lastCorners: Array<org.opencv.core.Point>? = null
+
+    fun incrementFrameIndex() {
+        currentFrameIndex++
+    }
+
+    fun cacheScanResult(
+        imagePath: String,
+        side: String,
+        frontScore: Double,
+        backScore: Double,
+        blurScore: Double,
+        glarePercent: Double,
+        x: Int,
+        y: Int,
+        w: Int,
+        h: Int
+    ) {
+        lastSuccessfulScanTime = System.currentTimeMillis()
+        cachedImagePath = imagePath
+        cachedSide = side
+        cachedFrontScore = frontScore
+        cachedBackScore = backScore
+        cachedBlurScore = blurScore
+        cachedGlarePercent = glarePercent
+        cachedAppliedX = x
+        cachedAppliedY = y
+        cachedAppliedW = w
+        cachedAppliedH = h
+    }
+
+    fun hasValidCachedResult(maxAgeMs: Long): Boolean {
+        val path = cachedImagePath
+        if (path.isNullOrBlank()) return false
+        val age = System.currentTimeMillis() - lastSuccessfulScanTime
+        return age in 0..maxAgeMs
+    }
+
+    fun getCachedResultMap(): Map<String, Any>? {
+        val path = cachedImagePath ?: return null
+        return mapOf(
+            "croppedImagePath" to path,
+            "side" to (cachedSide ?: "unknown"),
+            "sideFrontScore" to cachedFrontScore,
+            "sideBackScore" to cachedBackScore,
+            "blurScore" to cachedBlurScore,
+            "glarePercent" to cachedGlarePercent,
+            "appliedX" to cachedAppliedX,
+            "appliedY" to cachedAppliedY,
+            "appliedW" to cachedAppliedW,
+            "appliedH" to cachedAppliedH
+        )
+    }
+
+    fun clearCache() {
+        cachedImagePath = null
+        cachedSide = null
+        cachedFrontScore = 0.0
+        cachedBackScore = 0.0
+    }
+
+    fun clearCorners() {
+        lastCorners = null
+    }
+
+    fun detectCardCorners(mat: Mat): Array<org.opencv.core.Point>? {
+        val gray = Mat()
+        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+        val blurred = Mat()
+        Imgproc.GaussianBlur(gray, blurred, org.opencv.core.Size(5.0, 5.0), 0.0)
+        val edges = Mat()
+        Imgproc.Canny(blurred, edges, 50.0, 150.0)
+
+        val contours = ArrayList<MatOfPoint>()
+        val hierarchy = Mat()
+        Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+
+        var maxArea = 0.0
+        var bestContour: MatOfPoint? = null
+        for (c in contours) {
+            val area = Imgproc.contourArea(c)
+            if (area > maxArea) {
+                maxArea = area
+                bestContour = c
+            }
+        }
+
+        var corners: Array<org.opencv.core.Point>? = null
+        if (bestContour != null && maxArea > (mat.cols() * mat.rows() * 0.10)) {
+            val mop2f = org.opencv.core.MatOfPoint2f(*bestContour.toArray())
+            val approx = org.opencv.core.MatOfPoint2f()
+            val peri = Imgproc.arcLength(mop2f, true)
+            Imgproc.approxPolyDP(mop2f, approx, 0.02 * peri, true)
+
+            val approxArray = approx.toArray()
+            if (approxArray.size == 4) {
+                corners = approxArray
+            }
+            mop2f.release()
+            approx.release()
+        }
+
+        gray.release()
+        blurred.release()
+        edges.release()
+        hierarchy.release()
+        for (c in contours) {
+            c.release()
+        }
+        return corners
+    }
+
+    fun calculateCornerDrift(current: Array<org.opencv.core.Point>, last: Array<org.opencv.core.Point>, width: Double): Double {
+        if (current.size != 4 || last.size != 4) return 1.0
+        val sortedCurrent = sortCorners(current)
+        val sortedLast = sortCorners(last)
+
+        var maxDrift = 0.0
+        for (i in 0 until 4) {
+            val dx = sortedCurrent[i].x - sortedLast[i].x
+            val dy = sortedCurrent[i].y - sortedLast[i].y
+            val dist = Math.sqrt(dx * dx + dy * dy)
+            if (dist > maxDrift) {
+                maxDrift = dist
+            }
+        }
+        return maxDrift / width
+    }
+
+    private fun sortCorners(pts: Array<org.opencv.core.Point>): Array<org.opencv.core.Point> {
+        val sorted = Array(4) { org.opencv.core.Point() }
+        sorted[0] = pts.minByOrNull { it.x + it.y } ?: pts[0]
+        sorted[2] = pts.maxByOrNull { it.x + it.y } ?: pts[2]
+        sorted[1] = pts.minByOrNull { it.y - it.x } ?: pts[1]
+        sorted[3] = pts.maxByOrNull { it.y - it.x } ?: pts[3]
+        return sorted
+    }
+
+    fun checkCardStability(mat: Mat): Boolean {
+        val current = detectCardCorners(mat)
+        val last = lastCorners
+
+        var stable = false
+        if (current != null && last != null) {
+            val drift = calculateCornerDrift(current, last, mat.cols().toDouble())
+            stable = drift < 0.10
+        }
+
+        if (current != null) {
+            lastCorners = current
+        }
+        return stable
+    }
 
     companion object {
         private const val LOG_TAG = "EkycCardScanner"
@@ -74,6 +257,11 @@ class CardScannerManager private constructor(private val context: Context) {
         val debugSkippedUprightRotation: Boolean = false,
         val debugSourcePhotoWidth: Int = 0,
         val debugSourcePhotoHeight: Int = 0,
+        val side: String? = null,
+        val sideFrontScore: Double? = null,
+        val sideBackScore: Double? = null,
+        val blurScore: Double? = null,
+        val glarePercent: Double? = null,
     )
 
     interface CardScannerEventListener {
@@ -84,7 +272,10 @@ class CardScannerManager private constructor(private val context: Context) {
             appliedX: Int,
             appliedY: Int,
             appliedWidth: Int,
-            appliedHeight: Int
+            appliedHeight: Int,
+            side: String,
+            sideFrontScore: Double,
+            sideBackScore: Double
         )
 
         fun onCardCaptureFailed(errorCode: String, errorMessage: String)
@@ -116,6 +307,7 @@ class CardScannerManager private constructor(private val context: Context) {
         bufferOrientation: String? = null,
         sourcePhotoWidth: Int = 0,
         sourcePhotoHeight: Int = 0,
+        expectedSide: String? = null,
     ): CropJpegOnlyResult {
         if (!initOpenCv()) {
             return CropJpegOnlyResult(
@@ -328,8 +520,69 @@ class CardScannerManager private constructor(private val context: Context) {
                     appliedY = y,
                     appliedW = w,
                     appliedH = h,
-                    errorCode = "NO_DOCUMENT_FOUND",
+                    errorCode = "NO_CARD_QUAD",
                     errorMessage = "Không tìm thấy giấy tờ trong khung hình",
+                    debugDecodedWidth = decW,
+                    debugDecodedHeight = decH,
+                    debugExifOrientation = exifTag,
+                    debugNormalizedWidth = nW ?: decW,
+                    debugNormalizedHeight = nH ?: decH,
+                    debugCropCoordinateSpace = cropCoordinateSpace,
+                    debugBufferOrientation = bufferOrientation,
+                    debugExpectedUprightWidth = if (useUpright) expW else null,
+                    debugExpectedUprightHeight = if (useUpright) expH else null,
+                    debugSkippedUprightRotation = skippedUprightRotate,
+                    debugSourcePhotoWidth = if (useUpright) sourcePhotoWidth else 0,
+                    debugSourcePhotoHeight = if (useUpright) sourcePhotoHeight else 0,
+                )
+            }
+
+            val qualityError = validateQuality(cloned)
+            if (qualityError != null) {
+                val errorMsg = when (qualityError) {
+                    "IMAGE_TOO_BLURRY" -> "Hình ảnh bị mờ nhòe, vui lòng giữ yên thiết bị"
+                    "IMAGE_HAS_MOTION_BLUR" -> "Hình ảnh bị nhòe do chuyển động, vui lòng chụp lại"
+                    "IMAGE_TOO_DARK" -> "Hình ảnh quá tối, vui lòng chụp ở nơi đủ sáng"
+                    "IMAGE_TOO_BRIGHT" -> "Hình ảnh quá sáng, vui lòng điều chỉnh ánh sáng"
+                    "IMAGE_LOW_CONTRAST" -> "Độ tương phản thấp, vui lòng đặt thẻ trên nền tương phản"
+                    "IMAGE_HAS_GLARE" -> "Hình ảnh bị lóa sáng, vui lòng điều chỉnh góc chụp"
+                    else -> "Chất lượng hình ảnh không đạt yêu cầu"
+                }
+                return CropJpegOnlyResult(
+                    success = false,
+                    croppedAbsolutePath = null,
+                    appliedX = x,
+                    appliedY = y,
+                    appliedW = w,
+                    appliedH = h,
+                    errorCode = qualityError,
+                    errorMessage = errorMsg,
+                    debugDecodedWidth = decW,
+                    debugDecodedHeight = decH,
+                    debugExifOrientation = exifTag,
+                    debugNormalizedWidth = nW ?: decW,
+                    debugNormalizedHeight = nH ?: decH,
+                    debugCropCoordinateSpace = cropCoordinateSpace,
+                    debugBufferOrientation = bufferOrientation,
+                    debugExpectedUprightWidth = if (useUpright) expW else null,
+                    debugExpectedUprightHeight = if (useUpright) expH else null,
+                    debugSkippedUprightRotation = skippedUprightRotate,
+                    debugSourcePhotoWidth = if (useUpright) sourcePhotoWidth else 0,
+                    debugSourcePhotoHeight = if (useUpright) sourcePhotoHeight else 0,
+                )
+            }
+
+            val ocrRes = runOcrAndSideClassification(cloned, expectedSide)
+            if (!ocrRes.success) {
+                return CropJpegOnlyResult(
+                    success = false,
+                    croppedAbsolutePath = null,
+                    appliedX = x,
+                    appliedY = y,
+                    appliedW = w,
+                    appliedH = h,
+                    errorCode = ocrRes.errorCode ?: "OCR_FAILED",
+                    errorMessage = ocrRes.errorMessage ?: "OCR validation failed",
                     debugDecodedWidth = decW,
                     debugDecodedHeight = decH,
                     debugExifOrientation = exifTag,
@@ -370,6 +623,10 @@ class CardScannerManager private constructor(private val context: Context) {
                     debugSourcePhotoHeight = if (useUpright) sourcePhotoHeight else 0,
                 )
             }
+
+            val finalBlur = computeBlurScore(cloned)
+            val finalGlare = computeGlarePercent(cloned)
+
             return CropJpegOnlyResult(
                 success = true,
                 croppedAbsolutePath = outFile.absolutePath,
@@ -391,6 +648,11 @@ class CardScannerManager private constructor(private val context: Context) {
                 debugSkippedUprightRotation = if (useUpright) skippedUprightRotate else false,
                 debugSourcePhotoWidth = if (useUpright) sourcePhotoWidth else 0,
                 debugSourcePhotoHeight = if (useUpright) sourcePhotoHeight else 0,
+                side = ocrRes.side,
+                sideFrontScore = ocrRes.frontScore,
+                sideBackScore = ocrRes.backScore,
+                blurScore = finalBlur,
+                glarePercent = finalGlare
             )
         } finally {
             cloned?.release()
@@ -414,6 +676,7 @@ class CardScannerManager private constructor(private val context: Context) {
         sourcePhotoW: Int,
         sourcePhotoH: Int,
         debugGallery: Boolean,
+        expectedSide: String?,
         callback: CropCallback
     ) {
         executor.execute {
@@ -429,6 +692,7 @@ class CardScannerManager private constructor(private val context: Context) {
                         bufferOrientation,
                         sourcePhotoW,
                         sourcePhotoH,
+                        expectedSide,
                     )
 
                 val debugDetails = mutableMapOf<String, Any>().apply {
@@ -469,7 +733,7 @@ class CardScannerManager private constructor(private val context: Context) {
                         )
                 }
 
-                val successMap = mapOf(
+                val successMap = mutableMapOf<String, Any>(
                     "success" to true,
                     "originalImagePath" to imagePath,
                     "croppedImagePath" to "file://$croppedAbs",
@@ -481,7 +745,13 @@ class CardScannerManager private constructor(private val context: Context) {
                     ),
                     "debugSavedToGallery" to debugSaved,
                     "cropDebug" to debugDetails
-                )
+                ).apply {
+                    r.side?.let { put("side", it) }
+                    r.sideFrontScore?.let { put("sideFrontScore", it) }
+                    r.sideBackScore?.let { put("sideBackScore", it) }
+                    r.blurScore?.let { put("blurScore", it) }
+                    r.glarePercent?.let { put("glarePercent", it) }
+                }
 
                 callback.onSuccess(successMap)
             } catch (e: Throwable) {
@@ -506,30 +776,32 @@ class CardScannerManager private constructor(private val context: Context) {
         val totalPixels = edges.cols() * edges.rows()
         val edgeDensity = nonZeroCount.toDouble() / totalPixels
 
-        val contours = ArrayList<MatOfPoint>()
-        val hierarchy = Mat()
-        Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
-
-        // Clean up allocated Mats
         gray.release()
         blurred.release()
         edges.release()
-        hierarchy.release()
-        val contoursCount = contours.size
-        for (c in contours) {
-            c.release()
+
+        if (edgeDensity < 0.003) {
+            return false
         }
-        val standardEdgeDensityThreshold = 0.003
-        val standardContoursCountThreshold = 5
 
-        Log.i(LOG_TAG, "isDocumentPresent: edgeDensity=$edgeDensity, contoursCount=$contoursCount")
-        Log.i(
-            LOG_TAG,
-            "edgeDensity thresholds: $standardEdgeDensityThreshold, contoursCount thresholds: $standardContoursCountThreshold"
-        )
+        val corners = detectCardCorners(mat)
+        if (corners == null || corners.size != 4) {
+            Log.i(LOG_TAG, "isDocumentPresent: failed because detected corners is not 4")
+            return false
+        }
 
-        // Standard thresholds: edge density at least 0.3% (0.003) and at least 5 contours
-        return edgeDensity >= 0.003 && contoursCount >= 5
+        val margin = 3.0
+        val W = mat.cols().toDouble()
+        val H = mat.rows().toDouble()
+        for (pt in corners) {
+            if (pt.x <= margin || pt.x >= (W - margin) || pt.y <= margin || pt.y >= (H - margin)) {
+                Log.i(LOG_TAG, "isDocumentPresent: failed because corner is clipped by margin: x=${pt.x}, y=${pt.y}, W=$W, H=$H")
+                return false
+            }
+        }
+
+        Log.i(LOG_TAG, "isDocumentPresent: PASSED! Corners detected and fully within crop region.")
+        return true
     }
 
     //dùng cho autocapture
@@ -657,14 +929,28 @@ class CardScannerManager private constructor(private val context: Context) {
         guideHeight: Double,
         bufferOrientation: String,
         blurVal: Double,
-        glarePct: Double
+        glarePct: Double,
+        expectedSide: String?,
+        frameIndex: Long
     ) {
         executor.execute {
+            Log.i("EkycCardScanner", "saveAndCropCardAsync task started for frame $frameIndex")
             var uprightMat: Mat? = null
             var croppedMat: Mat? = null
 
             try {
+                val gap = currentFrameIndex - frameIndex
+                if (gap > 8) {
+                    Log.w("EkycCardScanner", "Stale Async Drop: frame index gap is $gap (max 8). Dropping.")
+                    eventListener?.onCardCaptureFailed("STALE_FRAME", "Frame processing took too long")
+                    return@execute
+                }
+
                 uprightMat = normalizeToUprightMat(bgrMat, bufferOrientation)
+                if (uprightMat.empty()) {
+                    eventListener?.onCardCaptureFailed("PROCESSING_EXCEPTION", "Input image buffer is empty")
+                    return@execute
+                }
 
                 val frameW = uprightMat.cols()
                 val frameH = uprightMat.rows()
@@ -695,16 +981,55 @@ class CardScannerManager private constructor(private val context: Context) {
                 rw += 2.0 * dx
                 rh += 2.0 * dy
 
-                val cropX = Math.round(rx).toInt().coerceIn(0, frameW - 1)
-                val cropY = Math.round(ry).toInt().coerceIn(0, frameH - 1)
-                val cropW = Math.round(rw).toInt().coerceIn(1, frameW - cropX)
-                val cropH = Math.round(rh).toInt().coerceIn(1, frameH - cropY)
+                val cropX = Math.round(rx).toInt().coerceIn(0, max(0, frameW - 1))
+                val cropY = Math.round(ry).toInt().coerceIn(0, max(0, frameH - 1))
+                val cropW = Math.round(rw).toInt().coerceIn(1, max(1, frameW - cropX))
+                val cropH = Math.round(rh).toInt().coerceIn(1, max(1, frameH - cropY))
 
                 croppedMat = Mat(uprightMat, Rect(cropX, cropY, cropW, cropH))
+
+                val qualityError = validateQuality(croppedMat)
+                if (qualityError != null) {
+                    Log.w("EkycCardScanner", "validateQuality failed: $qualityError")
+                    val errorMsg = when (qualityError) {
+                        "IMAGE_TOO_BLURRY" -> "Hình ảnh bị mờ nhòe, vui lòng giữ yên thiết bị"
+                        "IMAGE_HAS_MOTION_BLUR" -> "Hình ảnh bị nhòe do chuyển động, vui lòng chụp lại"
+                        "IMAGE_TOO_DARK" -> "Hình ảnh quá tối, vui lòng chụp ở nơi đủ sáng"
+                        "IMAGE_TOO_BRIGHT" -> "Hình ảnh quá sáng, vui lòng điều chỉnh ánh sáng"
+                        "IMAGE_LOW_CONTRAST" -> "Độ tương phản thấp, vui lòng đặt thẻ trên nền tương phản"
+                        "IMAGE_HAS_GLARE" -> "Hình ảnh bị lóa sáng, vui lòng điều chỉnh góc chụp"
+                        else -> "Chất lượng hình ảnh không đạt yêu cầu"
+                    }
+                    eventListener?.onCardCaptureFailed(qualityError, errorMsg)
+                    return@execute
+                }
+
+                val ocrRes = runOcrAndSideClassification(croppedMat, expectedSide)
+                if (!ocrRes.success) {
+                    Log.w("EkycCardScanner", "OCR Side Classification failed: code=${ocrRes.errorCode}, message=${ocrRes.errorMessage}")
+                    eventListener?.onCardCaptureFailed(
+                        ocrRes.errorCode ?: "OCR_FAILED",
+                        ocrRes.errorMessage ?: "OCR validation failed"
+                    )
+                    return@execute
+                }
 
                 val outFile = File(context.cacheDir, "card_scan_${UUID.randomUUID()}.jpg")
                 val saved = Imgcodecs.imwrite(outFile.absolutePath, croppedMat)
                 if (saved) {
+                    Log.i("EkycCardScanner", "saveAndCropCardAsync succeeded! Cached and Emitting success event.")
+                    cacheScanResult(
+                        "file://${outFile.absolutePath}",
+                        ocrRes.side,
+                        ocrRes.frontScore,
+                        ocrRes.backScore,
+                        blurVal,
+                        glarePct,
+                        cropX,
+                        cropY,
+                        cropW,
+                        cropH
+                    )
                     eventListener?.onCardCaptured(
                         "file://${outFile.absolutePath}",
                         blurVal,
@@ -712,7 +1037,10 @@ class CardScannerManager private constructor(private val context: Context) {
                         cropX,
                         cropY,
                         cropW,
-                        cropH
+                        cropH,
+                        ocrRes.side,
+                        ocrRes.frontScore,
+                        ocrRes.backScore
                     )
                 } else {
                     eventListener?.onCardCaptureFailed("SAVE_FAILED", "Failed to write cropped JPEG")
@@ -725,6 +1053,223 @@ class CardScannerManager private constructor(private val context: Context) {
                 bgrMat.release() // CRITICAL: release the copied frame Mat to prevent memory leak!
             }
         }
+    }
+
+    data class OcrResult(
+        val success: Boolean,
+        val side: String,
+        val frontScore: Double,
+        val backScore: Double,
+        val errorCode: String?,
+        val errorMessage: String?
+    )
+
+    fun runOcrAndSideClassification(mat: Mat, expectedSide: String?): OcrResult {
+        val bmp = try {
+            val b = Bitmap.createBitmap(mat.cols(), mat.rows(), Bitmap.Config.ARGB_8888)
+            org.opencv.android.Utils.matToBitmap(mat, b)
+            b
+        } catch (e: Exception) {
+            return OcrResult(false, "unknown", 0.0, 0.0, "OCR_FAILED", "Failed to convert OpenCV Mat to Bitmap: ${e.message}")
+        }
+
+        val image = InputImage.fromBitmap(bmp, 0)
+        return try {
+            val task = recognizer.process(image)
+            val resultText = Tasks.await(task)
+            val fullText = resultText.text
+            if (fullText.isNullOrBlank()) {
+                OcrResult(false, "unknown", 0.0, 0.0, "OCR_FAILED", "Không thể nhận diện được chữ trên thẻ")
+            } else {
+                val normalized = normalizeText(fullText)
+                var frontScore = 0.0
+                var backScore = 0.0
+
+                val frontKeywords = listOf(
+                    "CAN CUOC", "CAN CUOC CONG DAN", "HO VA TEN", "NGAY SINH", "QUOC TICH", "GIOI TINH",
+                    "SO CC", "SO CCCD", "CCCD", "CONG HOA XA HOI CHU NGHIA VIET NAM", "DOC LAP TU DO HANH PHUC",
+                    "SO DINH DANH CA NHAN", "HO CHU DEM VA TEN KHAI SINH", "NGAY THANG NAM SINH",
+                    "CO GIA TRI DEN", "IDENTITY CARD", "CITIZEN IDENTITY CARD", "QUE QUAN", "NOI THUONG TRU"
+                )
+
+                val backKeywords = listOf(
+                    "DAC DIEM NHAN DANG", "NOI CU TRU", "NGAY CAP", "NOI DKKTT", "IDVNM", "BO CONG AN",
+                    "MINISTRY OF PUBLIC SECURITY", "NOI DANG KY KHAI SINH", "PLACE OF BIRTH REGISTRATION",
+                    "PLACE OF RESIDENCE", "NGON TRO TRAI", "NGON TRO PHAI", "LEFT INDEX FINGER", "RIGHT INDEX FINGER",
+                    "CUC TRUONG CUC CANH SAT", "PERSONAL IDENTIFICATION"
+                )
+
+                for (kw in frontKeywords) {
+                    if (normalized.contains(kw)) {
+                        frontScore += 1.0
+                    }
+                }
+
+                for (kw in backKeywords) {
+                    if (normalized.contains(kw)) {
+                        backScore += 1.0
+                    }
+                }
+
+                val actualSide = if (frontScore == 0.0 && backScore == 0.0) {
+                    "unknown"
+                } else if (frontScore > backScore) {
+                    "front"
+                } else if (backScore > frontScore) {
+                    "back"
+                } else {
+                    "unknown"
+                }
+
+                if (expectedSide != null && expectedSide != "unknown" && actualSide != "unknown") {
+                    if (expectedSide == "front" && actualSide == "back") {
+                        OcrResult(false, actualSide, frontScore, backScore, "EXPECTED_FRONT_BUT_GOT_BACK", "Thẻ được quét là mặt sau, vui lòng quét mặt trước")
+                    } else if (expectedSide == "back" && actualSide == "front") {
+                        OcrResult(false, actualSide, frontScore, backScore, "EXPECTED_BACK_BUT_GOT_FRONT", "Thẻ được quét là mặt trước, vui lòng quét mặt sau")
+                    } else {
+                        OcrResult(true, actualSide, frontScore, backScore, null, null)
+                    }
+                } else if (actualSide == "unknown") {
+                    OcrResult(false, actualSide, frontScore, backScore, "OCR_FAILED", "Không thể xác định mặt thẻ (mờ hoặc sai giấy tờ)")
+                } else {
+                    OcrResult(true, actualSide, frontScore, backScore, null, null)
+                }
+            }
+        } catch (e: Exception) {
+            OcrResult(false, "unknown", 0.0, 0.0, "OCR_FAILED", "OCR process error: ${e.message}")
+        } finally {
+            bmp.recycle()
+        }
+    }
+
+    private fun normalizeText(text: String): String {
+        val temp = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD)
+        val pattern = java.util.regex.Pattern.compile("\\p{InCombiningDiacriticalMarks}+")
+        return pattern.matcher(temp).replaceAll("").uppercase()
+    }
+
+    fun validateQuality(mat: Mat): String? {
+        val gray = Mat()
+        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+
+        val mean = MatOfDouble()
+        val stddev = MatOfDouble()
+        Core.meanStdDev(gray, mean, stddev)
+        val meanVal = mean.toArray()[0]
+        val stddevVal = stddev.toArray()[0]
+
+        if (meanVal < 58.0) {
+            gray.release()
+            mean.release()
+            stddev.release()
+            return "IMAGE_TOO_DARK"
+        }
+        if (meanVal > 220.0) {
+            gray.release()
+            mean.release()
+            stddev.release()
+            return "IMAGE_TOO_BRIGHT"
+        }
+        if (stddevVal < 12.0) {
+            gray.release()
+            mean.release()
+            stddev.release()
+            return "IMAGE_LOW_CONTRAST"
+        }
+
+        val laplacian = Mat()
+        Imgproc.Laplacian(gray, laplacian, CvType.CV_64F)
+        val lapMean = MatOfDouble()
+        val lapStddev = MatOfDouble()
+        Core.meanStdDev(laplacian, lapMean, lapStddev)
+        val lapStdVal = lapStddev.toArray()[0]
+        val blurVariance = lapStdVal * lapStdVal
+
+        laplacian.release()
+        lapMean.release()
+        lapStddev.release()
+
+        if (blurVariance < 80.0) {
+            gray.release()
+            mean.release()
+            stddev.release()
+            return "IMAGE_TOO_BLURRY"
+        }
+
+        val sobelX = Mat()
+        val sobelY = Mat()
+        Imgproc.Sobel(gray, sobelX, CvType.CV_32F, 1, 0)
+        Imgproc.Sobel(gray, sobelY, CvType.CV_32F, 0, 1)
+        val absX = Mat()
+        val absY = Mat()
+        Core.absdiff(sobelX, Mat.zeros(sobelX.size(), sobelX.type()), absX)
+        Core.absdiff(sobelY, Mat.zeros(sobelY.size(), sobelY.type()), absY)
+        val sumX = Core.sumElems(absX).`val`[0]
+        val sumY = Core.sumElems(absY).`val`[0]
+
+        sobelX.release()
+        sobelY.release()
+        absX.release()
+        absY.release()
+
+        val motionScore = if (sumX + sumY > 0) Math.abs(sumX - sumY) / (sumX + sumY) else 0.0
+        if (motionScore > 0.82 && blurVariance < 124.0) {
+            gray.release()
+            mean.release()
+            stddev.release()
+            return "IMAGE_HAS_MOTION_BLUR"
+        }
+
+        gray.release()
+        mean.release()
+        stddev.release()
+
+        val hsv = Mat()
+        Imgproc.cvtColor(mat, hsv, Imgproc.COLOR_BGR2HSV)
+        val channels = ArrayList<Mat>()
+        Core.split(hsv, channels)
+        val s = channels[1]
+        val v = channels[2]
+
+        val maskS = Mat()
+        val maskV = Mat()
+        Imgproc.threshold(s, maskS, 42.0, 255.0, Imgproc.THRESH_BINARY_INV)
+        Imgproc.threshold(v, maskV, 247.0, 255.0, Imgproc.THRESH_BINARY)
+
+        val glareMask = Mat()
+        Core.bitwise_and(maskS, maskV, glareMask)
+
+        val labels = Mat()
+        val stats = Mat()
+        val centroids = Mat()
+        val numComponents = Imgproc.connectedComponentsWithStats(glareMask, labels, stats, centroids)
+
+        var maxGlareArea = 0
+        val totalPixels = mat.cols() * mat.rows()
+        for (i in 1 until numComponents) {
+            val area = stats.get(i, Imgproc.CC_STAT_AREA)[0].toInt()
+            if (area > maxGlareArea) {
+                maxGlareArea = area
+            }
+        }
+
+        hsv.release()
+        glareMask.release()
+        maskS.release()
+        maskV.release()
+        labels.release()
+        stats.release()
+        centroids.release()
+        for (c in channels) {
+            c.release()
+        }
+
+        val glarePercent = maxGlareArea.toDouble() / totalPixels
+        if (glarePercent >= 0.035) {
+            return "IMAGE_HAS_GLARE"
+        }
+
+        return null
     }
 
     // --- Private Helper Methods ---

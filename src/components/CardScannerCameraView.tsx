@@ -77,6 +77,11 @@ export interface CardScannerCameraViewProps {
   showGuide?: boolean;
   children?: React.ReactNode;
   onPhotoCaptured?: (imagePath: string, scanResult: ScanCardResult) => void;
+  onFrameValidated?: (result: {
+    isDocumentPresent: boolean;
+    blurScore: number;
+    glarePercent: number;
+  }) => void;
 }
 export interface CardScannerCameraInnerProps extends CardScannerCameraViewProps {
   onRetry: () => void;
@@ -109,6 +114,7 @@ const CardScannerCameraInner = forwardRef<
       onPhotoCaptured,
       onRetry,
       onAutoRetry,
+      onFrameValidated,
     },
     ref
   ) => {
@@ -157,6 +163,15 @@ const CardScannerCameraInner = forwardRef<
       setIsDocDetected(detected);
     }, []);
 
+    const onFrameValidatedJS = useRunOnJS(
+      (isDocumentPresent: boolean, blurScore: number, glarePercent: number) => {
+        if (onFrameValidated) {
+          onFrameValidated({ isDocumentPresent, blurScore, glarePercent });
+        }
+      },
+      [onFrameValidated]
+    );
+
     useEffect(() => {
       if (!autocapture || !isActive) {
         setIsDocDetected(false);
@@ -175,9 +190,9 @@ const CardScannerCameraInner = forwardRef<
               success: true,
               originalImagePath: event.croppedImagePath,
               croppedImagePath: event.croppedImagePath,
-              side: expectedSide ?? 'unknown',
-              sideFrontScore: 1.0,
-              sideBackScore: 0.0,
+              side: event.side || expectedSide || 'unknown',
+              sideFrontScore: event.sideFrontScore ?? 0,
+              sideBackScore: event.sideBackScore ?? 0,
               quality: {
                 passed: true,
                 blurScore: event.blurScore ?? 0.0,
@@ -199,6 +214,30 @@ const CardScannerCameraInner = forwardRef<
             await onPhotoCaptured?.(event.croppedImagePath, scanResult);
             captureLockRef.current = false;
             setBusy(false);
+          } else if (!event.success) {
+            captureLockRef.current = true;
+            setBusy(true);
+            const scanResult: ScanCardResult = {
+              success: false,
+              originalImagePath: '',
+              side: expectedSide ?? 'unknown',
+              sideFrontScore: 0,
+              sideBackScore: 0,
+              quality: {
+                passed: false,
+                blurScore: event.blurScore ?? 0.0,
+                motionScore: 0.0,
+                glareScore: (event.glarePercent ?? 0.0) * 100,
+                exposure: 'ok',
+                reasons: [event.errorCode ?? 'QUALITY_FAILED'],
+              },
+              manualCaptureDebugSavedToGallery: false,
+              errorCode: event.errorCode,
+              errorMessage: event.errorMessage,
+            };
+            await onPhotoCaptured?.('', scanResult);
+            captureLockRef.current = false;
+            setBusy(false);
           }
         }
       );
@@ -213,6 +252,7 @@ const CardScannerCameraInner = forwardRef<
         'worklet';
         if (busy || captureLockRef.current) {
           updateDocDetected(false);
+          onFrameValidatedJS(false, 0, 0);
           return;
         }
 
@@ -227,15 +267,22 @@ const CardScannerCameraInner = forwardRef<
           throttleMs: 150,
           blurThreshold: 150.0,
           glareThreshold: 0.05,
+          expectedSide: expectedSide,
         });
 
         if (result) {
           updateDocDetected(result.isDocumentPresent);
+          onFrameValidatedJS(
+            result.isDocumentPresent,
+            result.blurScore,
+            result.glarePercent
+          );
         } else {
           updateDocDetected(false);
+          onFrameValidatedJS(false, 0, 0);
         }
       },
-      [previewSize, overlayGuide, busy, updateDocDetected]
+      [previewSize, overlayGuide, busy, updateDocDetected, onFrameValidatedJS]
     );
 
     useEffect(() => {
@@ -347,6 +394,7 @@ const CardScannerCameraInner = forwardRef<
           sourcePhotoWidth: cropPlan.sourcePhotoWidth,
           sourcePhotoHeight: cropPlan.sourcePhotoHeight,
           manualCaptureDebugSaveToGallery: true,
+          expectedSide: expectedSide,
         });
 
         const scanResult = manualCropOnlyToScanResult(

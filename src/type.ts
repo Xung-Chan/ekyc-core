@@ -147,6 +147,7 @@ export type CropCardImageOnlyParams = {
   sourcePhotoWidth?: number;
   sourcePhotoHeight?: number;
   manualCaptureDebugSaveToGallery?: boolean;
+  expectedSide?: 'front' | 'back';
 };
 
 export type CropCardImageOnlyDebug = {
@@ -173,6 +174,11 @@ export type CropCardImageOnlyResult = {
   debugSavedToGallery: boolean;
   errorCode?: string;
   errorMessage?: string;
+  side?: string;
+  sideFrontScore?: number;
+  sideBackScore?: number;
+  blurScore?: number;
+  glarePercent?: number;
 };
 
 export type ScanCardResult = {

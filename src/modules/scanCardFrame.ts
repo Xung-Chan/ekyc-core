@@ -13,6 +13,7 @@ export interface ScanCardFrameParams {
   throttleMs?: number;
   blurThreshold?: number;
   glareThreshold?: number;
+  expectedSide?: string;
 }
 
 export interface ScanFrameResult {

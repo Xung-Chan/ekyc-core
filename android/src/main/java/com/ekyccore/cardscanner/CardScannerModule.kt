@@ -72,6 +72,7 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
             sourcePhotoW = dto.sourcePhotoWidth,
             sourcePhotoH = dto.sourcePhotoHeight,
             debugGallery = dto.manualCaptureDebugSaveToGallery,
+            expectedSide = dto.expectedSide,
             callback = object : CardScannerManager.CropCallback {
                 override fun onSuccess(result: Map<String, Any>) {
                     promise?.resolve(mapToWritableMap(result))
@@ -163,13 +164,19 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
         appliedX: Int,
         appliedY: Int,
         appliedWidth: Int,
-        appliedHeight: Int
+        appliedHeight: Int,
+        side: String,
+        sideFrontScore: Double,
+        sideBackScore: Double
     ) {
         val event = Arguments.createMap().apply {
             putBoolean("success", true)
             putString("croppedImagePath", croppedImagePath)
             putDouble("blurScore", blurScore)
             putDouble("glarePercent", glarePercent)
+            putString("side", side)
+            putDouble("sideFrontScore", sideFrontScore)
+            putDouble("sideBackScore", sideBackScore)
             putMap("appliedCrop", Arguments.createMap().apply {
                 putInt("x", appliedX)
                 putInt("y", appliedY)

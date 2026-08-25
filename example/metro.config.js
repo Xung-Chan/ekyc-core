@@ -16,4 +16,15 @@ const config = withMetroConfig(getDefaultConfig(__dirname), {
   conditions: ['xungchan-ekyc-core-source'],
 });
 
+config.resolver.blockList = [
+  ...(Array.isArray(config.resolver.blockList)
+    ? config.resolver.blockList
+    : config.resolver.blockList
+      ? [config.resolver.blockList]
+      : []),
+  /.*\/CMakeTmp\/.*/,
+  /.*\.cxx\/.*/,
+  /.*\/android\/build\/.*/,
+];
+
 module.exports = config;

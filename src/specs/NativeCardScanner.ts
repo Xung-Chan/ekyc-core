@@ -15,6 +15,7 @@ export interface CropCardImageOnlyParams {
   sourcePhotoWidth?: number;
   sourcePhotoHeight?: number;
   manualCaptureDebugSaveToGallery?: boolean;
+  expectedSide?: string;
 }
 
 export interface CropCardImageOnlyDebug {
@@ -41,6 +42,11 @@ export interface CropCardImageOnlyResult {
   debugSavedToGallery: boolean;
   errorCode?: string;
   errorMessage?: string;
+  side?: string;
+  sideFrontScore?: number;
+  sideBackScore?: number;
+  blurScore?: number;
+  glarePercent?: number;
 }
 
 export interface CleanUpResult {

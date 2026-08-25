@@ -23,24 +23,87 @@ export default function CCCDCapture() {
 
   const [currentSide, setCurrentSide] = useState<'front' | 'back'>('front');
   const [isBusy, setIsBusy] = useState(false);
+  const [isAuto, setIsAuto] = useState(true);
+  const [hintLock, setHintLock] = useState(false);
+  const [validationHint, setValidationHint] = useState<{
+    text: string;
+    type: 'neutral' | 'warning' | 'success';
+  }>({ text: 'Đặt giấy tờ vào khung hình', type: 'neutral' });
+
+  const handleFrameValidated = (result: {
+    isDocumentPresent: boolean;
+    blurScore: number;
+    glarePercent: number;
+  }) => {
+    if (hintLock) return;
+
+    if (!result.isDocumentPresent) {
+      setValidationHint({
+        text: 'Đặt giấy tờ vào khung hình',
+        type: 'neutral',
+      });
+    } else if (result.blurScore < 150) {
+      setValidationHint({
+        text: 'Hình ảnh bị mờ, vui lòng giữ yên thiết bị',
+        type: 'warning',
+      });
+    } else if (result.glarePercent > 0.05) {
+      setValidationHint({
+        text: 'Hình ảnh bị lóa sáng, vui lòng điều chỉnh góc chụp',
+        type: 'warning',
+      });
+    } else {
+      setValidationHint({
+        text: 'Giữ nguyên để tự động chụp...',
+        type: 'success',
+      });
+    }
+  };
 
   const handlePhotoCaptured = (path: string, scanResult: ScanCardResult) => {
     console.log('[CCCDCapture] Captured photo:', path, scanResult);
     if (!scanResult.success) {
-      Alert.alert(
-        'Lỗi',
-        'Không thể nhận diện được giấy tờ. Vui lòng chụp lại rõ nét hơn.'
-      );
+      setHintLock(true);
+      setValidationHint({
+        text:
+          scanResult.errorMessage ||
+          'Nhận diện thất bại. Vui lòng chụp lại rõ nét hơn.',
+        type: 'warning',
+      });
+      setTimeout(() => {
+        setHintLock(false);
+        setValidationHint({
+          text: 'Đặt giấy tờ vào khung hình',
+          type: 'neutral',
+        });
+      }, 3000);
       return;
     }
 
+    setHintLock(true);
     if (currentSide === 'front') {
       setFrontImage(path);
-      setCurrentSide('back');
+      setValidationHint({
+        text: 'Chụp ảnh mặt trước thành công!',
+        type: 'success',
+      });
+      setTimeout(() => {
+        setCurrentSide('back');
+        setHintLock(false);
+        setValidationHint({
+          text: 'Đặt mặt sau giấy tờ vào khung hình',
+          type: 'neutral',
+        });
+      }, 1500);
     } else {
       setBackImage(path);
-      setCurrentSide('front');
-      navigateToPreview();
+      setValidationHint({
+        text: 'Chụp ảnh mặt sau thành công! Đang hoàn tất...',
+        type: 'success',
+      });
+      setTimeout(() => {
+        navigateToPreview();
+      }, 1500);
     }
   };
 
@@ -80,7 +143,8 @@ export default function CCCDCapture() {
           isActive={true}
           expectedSide={currentSide}
           onPhotoCaptured={handlePhotoCaptured}
-          autocapture={false}
+          autocapture={isAuto}
+          onFrameValidated={isAuto ? handleFrameValidated : undefined}
         />
       </View>
 
@@ -96,13 +160,95 @@ export default function CCCDCapture() {
 
       {/* HUD overlays */}
       <View style={styles.hudContainer} pointerEvents="box-none">
-        {/* Instruction Banner */}
-        <View style={styles.instructionBanner}>
-          <Text style={styles.instructionText}>{instructionText}</Text>
+        {/* Instruction & Validation Hints */}
+        <View style={styles.hintsWrapper}>
+          <View style={styles.instructionBanner}>
+            <Text style={styles.instructionText}>{instructionText}</Text>
+          </View>
+
+          <View
+            style={[
+              styles.validationBubble,
+              (isBusy
+                ? 'neutral'
+                : isAuto
+                  ? validationHint.type
+                  : 'neutral') === 'warning' && styles.validationBubbleWarning,
+              (isBusy
+                ? 'neutral'
+                : isAuto
+                  ? validationHint.type
+                  : 'neutral') === 'success' && styles.validationBubbleSuccess,
+            ]}
+          >
+            <View
+              style={[
+                styles.validationIndicator,
+                (isBusy
+                  ? 'neutral'
+                  : isAuto
+                    ? validationHint.type
+                    : 'neutral') === 'warning' &&
+                  styles.validationIndicatorWarning,
+                (isBusy
+                  ? 'neutral'
+                  : isAuto
+                    ? validationHint.type
+                    : 'neutral') === 'success' &&
+                  styles.validationIndicatorSuccess,
+              ]}
+            />
+            <Text style={styles.validationText}>
+              {isBusy
+                ? 'Đang xử lý...'
+                : isAuto
+                  ? validationHint.text
+                  : 'Đặt giấy tờ vào khung hình và nhấn nút chụp'}
+            </Text>
+          </View>
         </View>
 
         {/* Bottom Section */}
         <View style={styles.bottomSection} pointerEvents="box-none">
+          {/* Capture Mode Toggle Switch */}
+          <View style={styles.toggleContainer}>
+            <Pressable
+              style={[styles.toggleButton, isAuto && styles.toggleButtonActive]}
+              onPress={() => {
+                setIsAuto(true);
+                setValidationHint({
+                  text: 'Đặt giấy tờ vào khung hình',
+                  type: 'neutral',
+                });
+              }}
+            >
+              <Text
+                style={[styles.toggleText, isAuto && styles.toggleTextActive]}
+              >
+                Tự động
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.toggleButton,
+                !isAuto && styles.toggleButtonActive,
+              ]}
+              onPress={() => {
+                setIsAuto(false);
+                setValidationHint({
+                  text: 'Đặt giấy tờ vào khung hình',
+                  type: 'neutral',
+                });
+              }}
+            >
+              <Text
+                style={[styles.toggleText, !isAuto && styles.toggleTextActive]}
+              >
+                Thủ công
+              </Text>
+            </Pressable>
+          </View>
+
           {/* Guideline */}
           <Pressable
             accessibilityRole="button"
@@ -258,5 +404,84 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 30,
     backgroundColor: '#FFFFFF',
+  },
+  hintsWrapper: {
+    alignSelf: 'center',
+    alignItems: 'center',
+    width: '100%',
+    gap: 12,
+  },
+  validationBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    maxWidth: '85%',
+    gap: 8,
+  },
+  validationBubbleWarning: {
+    backgroundColor: 'rgba(234, 88, 12, 0.15)',
+    borderColor: 'rgba(234, 88, 12, 0.3)',
+  },
+  validationBubbleSuccess: {
+    backgroundColor: 'rgba(22, 163, 74, 0.15)',
+    borderColor: 'rgba(22, 163, 74, 0.3)',
+  },
+  validationIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#94a3b8',
+  },
+  validationIndicatorWarning: {
+    backgroundColor: '#ea580c',
+  },
+  validationIndicatorSuccess: {
+    backgroundColor: '#16a34a',
+  },
+  validationText: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    borderRadius: 24,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignSelf: 'center',
+    marginBottom: 16,
+    width: 180,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 6,
+    alignItems: 'center',
+    borderRadius: 20,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  toggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontFamily: 'Inter',
+  },
+  toggleTextActive: {
+    color: '#0f172a',
   },
 });
