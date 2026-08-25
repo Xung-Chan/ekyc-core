@@ -8,6 +8,7 @@ import {
   StatusBar,
   SafeAreaView,
   Alert,
+  Image,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import {
@@ -29,6 +30,8 @@ export default function CCCDCapture() {
     text: string;
     type: 'neutral' | 'warning' | 'success';
   }>({ text: 'Đặt giấy tờ vào khung hình', type: 'neutral' });
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
+  const [retakeLock, setRetakeLock] = useState(false);
 
   const handleFrameValidated = (result: {
     isDocumentPresent: boolean;
@@ -73,37 +76,64 @@ export default function CCCDCapture() {
       setTimeout(() => {
         setHintLock(false);
         setValidationHint({
-          text: 'Đặt giấy tờ vào khung hình',
+          text:
+            currentSide === 'front'
+              ? 'Đặt giấy tờ vào khung hình'
+              : 'Đặt mặt sau giấy tờ vào khung hình',
           type: 'neutral',
         });
+        cardCameraRef.current?.reset();
+        cardCameraRef.current?.start();
       }, 3000);
       return;
     }
 
+    setPreviewPath(scanResult.croppedImagePath || path);
+    console.log('path', path);
+    console.log('preview', scanResult.croppedImagePath || path);
     setHintLock(true);
+    setValidationHint({
+      text: `Kiểm tra ảnh chụp mặt ${currentSide === 'front' ? 'trước' : 'sau'}`,
+      type: 'neutral',
+    });
+  };
+
+  const handleRetake = () => {
+    setPreviewPath(null);
+    setRetakeLock(true);
+    setHintLock(false);
+    setValidationHint({
+      text:
+        currentSide === 'front'
+          ? 'Đặt giấy tờ vào khung hình'
+          : 'Đặt mặt sau giấy tờ vào khung hình',
+      type: 'neutral',
+    });
+    cardCameraRef.current?.reset();
+    cardCameraRef.current?.start();
+    setTimeout(() => {
+      setRetakeLock(false);
+    }, 1500);
+  };
+
+  const handleConfirm = () => {
+    if (!previewPath) return;
+
     if (currentSide === 'front') {
-      setFrontImage(path);
+      setFrontImage(previewPath);
+      setPreviewPath(null);
+      setCurrentSide('back');
+      setHintLock(false);
       setValidationHint({
-        text: 'Chụp ảnh mặt trước thành công!',
-        type: 'success',
+        text: 'Đặt mặt sau giấy tờ vào khung hình',
+        type: 'neutral',
       });
-      setTimeout(() => {
-        setCurrentSide('back');
-        setHintLock(false);
-        setValidationHint({
-          text: 'Đặt mặt sau giấy tờ vào khung hình',
-          type: 'neutral',
-        });
-      }, 1500);
+      cardCameraRef.current?.reset();
+      cardCameraRef.current?.start();
     } else {
-      setBackImage(path);
-      setValidationHint({
-        text: 'Chụp ảnh mặt sau thành công! Đang hoàn tất...',
-        type: 'success',
-      });
-      setTimeout(() => {
-        navigateToPreview();
-      }, 1500);
+      setBackImage(previewPath);
+      setPreviewPath(null);
+      navigateToPreview();
     }
   };
 
@@ -137,15 +167,31 @@ export default function CCCDCapture() {
 
       {/* Camera View */}
       <View style={styles.cameraContainer}>
-        <CardScannerCameraView
-          ref={cardCameraRef}
-          style={StyleSheet.absoluteFill}
-          isActive={true}
-          expectedSide={currentSide}
-          onPhotoCaptured={handlePhotoCaptured}
-          autocapture={isAuto}
-          onFrameValidated={isAuto ? handleFrameValidated : undefined}
-        />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            previewPath ? styles.cameraHidden : styles.cameraVisible,
+          ]}
+        >
+          <CardScannerCameraView
+            ref={cardCameraRef}
+            style={StyleSheet.absoluteFill}
+            isActive={previewPath ? false : true}
+            expectedSide={currentSide}
+            onPhotoCaptured={handlePhotoCaptured}
+            autocapture={isAuto && !retakeLock}
+            onFrameValidated={
+              isAuto && !retakeLock ? handleFrameValidated : undefined
+            }
+          />
+        </View>
+        {previewPath && (
+          <Image
+            source={{ uri: previewPath }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="contain"
+          />
+        )}
       </View>
 
       {/* Header Overlay */}
@@ -163,129 +209,177 @@ export default function CCCDCapture() {
         {/* Instruction & Validation Hints */}
         <View style={styles.hintsWrapper}>
           <View style={styles.instructionBanner}>
-            <Text style={styles.instructionText}>{instructionText}</Text>
+            <Text style={styles.instructionText}>
+              {previewPath
+                ? `Xem lại ảnh chụp mặt ${currentSide === 'front' ? 'trước' : 'sau'}`
+                : instructionText}
+            </Text>
           </View>
 
           <View
             style={[
               styles.validationBubble,
-              (isBusy
-                ? 'neutral'
-                : isAuto
-                  ? validationHint.type
-                  : 'neutral') === 'warning' && styles.validationBubbleWarning,
-              (isBusy
-                ? 'neutral'
-                : isAuto
-                  ? validationHint.type
-                  : 'neutral') === 'success' && styles.validationBubbleSuccess,
-            ]}
-          >
-            <View
-              style={[
-                styles.validationIndicator,
+              !previewPath &&
                 (isBusy
                   ? 'neutral'
                   : isAuto
                     ? validationHint.type
                     : 'neutral') === 'warning' &&
-                  styles.validationIndicatorWarning,
+                styles.validationBubbleWarning,
+              !previewPath &&
                 (isBusy
                   ? 'neutral'
                   : isAuto
                     ? validationHint.type
                     : 'neutral') === 'success' &&
-                  styles.validationIndicatorSuccess,
-              ]}
-            />
+                styles.validationBubbleSuccess,
+            ]}
+          >
+            {!previewPath && (
+              <View
+                style={[
+                  styles.validationIndicator,
+                  (isBusy
+                    ? 'neutral'
+                    : isAuto
+                      ? validationHint.type
+                      : 'neutral') === 'warning' &&
+                    styles.validationIndicatorWarning,
+                  (isBusy
+                    ? 'neutral'
+                    : isAuto
+                      ? validationHint.type
+                      : 'neutral') === 'success' &&
+                    styles.validationIndicatorSuccess,
+                ]}
+              />
+            )}
             <Text style={styles.validationText}>
-              {isBusy
-                ? 'Đang xử lý...'
-                : isAuto
-                  ? validationHint.text
-                  : 'Đặt giấy tờ vào khung hình và nhấn nút chụp'}
+              {previewPath
+                ? 'Vui lòng kiểm tra thông tin rõ nét, không mờ nhòe, lóa sáng.'
+                : isBusy
+                  ? 'Đang xử lý...'
+                  : isAuto
+                    ? validationHint.text
+                    : 'Đặt giấy tờ vào khung hình và nhấn nút chụp'}
             </Text>
           </View>
         </View>
 
         {/* Bottom Section */}
         <View style={styles.bottomSection} pointerEvents="box-none">
-          {/* Capture Mode Toggle Switch */}
-          <View style={styles.toggleContainer}>
-            <Pressable
-              style={[styles.toggleButton, isAuto && styles.toggleButtonActive]}
-              onPress={() => {
-                setIsAuto(true);
-                setValidationHint({
-                  text: 'Đặt giấy tờ vào khung hình',
-                  type: 'neutral',
-                });
-              }}
-            >
-              <Text
-                style={[styles.toggleText, isAuto && styles.toggleTextActive]}
+          {previewPath ? (
+            <View style={styles.previewButtonsContainer}>
+              <Pressable
+                accessibilityRole="button"
+                style={styles.retakeButton}
+                onPress={handleRetake}
               >
-                Tự động
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.toggleButton,
-                !isAuto && styles.toggleButtonActive,
-              ]}
-              onPress={() => {
-                setIsAuto(false);
-                setValidationHint({
-                  text: 'Đặt giấy tờ vào khung hình',
-                  type: 'neutral',
-                });
-              }}
-            >
-              <Text
-                style={[styles.toggleText, !isAuto && styles.toggleTextActive]}
+                <Text style={styles.retakeButtonText}>Chụp lại</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                style={styles.confirmButton}
+                onPress={handleConfirm}
               >
-                Thủ công
-              </Text>
-            </Pressable>
-          </View>
+                <Text style={styles.confirmButtonText}>Lấy ảnh này</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              {/* Capture Mode Toggle Switch */}
+              <View style={styles.toggleContainer}>
+                <Pressable
+                  style={[
+                    styles.toggleButton,
+                    isAuto && styles.toggleButtonActive,
+                  ]}
+                  onPress={() => {
+                    setIsAuto(true);
+                    setValidationHint({
+                      text: 'Đặt giấy tờ vào khung hình',
+                      type: 'neutral',
+                    });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      isAuto && styles.toggleTextActive,
+                    ]}
+                  >
+                    Tự động
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.toggleButton,
+                    !isAuto && styles.toggleButtonActive,
+                  ]}
+                  onPress={() => {
+                    setIsAuto(false);
+                    setValidationHint({
+                      text: 'Đặt giấy tờ vào khung hình',
+                      type: 'neutral',
+                    });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      !isAuto && styles.toggleTextActive,
+                    ]}
+                  >
+                    Thủ công
+                  </Text>
+                </Pressable>
+              </View>
 
-          {/* Guideline */}
-          <Pressable
-            accessibilityRole="button"
-            onPress={() =>
-              Alert.alert(
-                'Hướng dẫn',
-                'Đặt giấy tờ tuỳ thân (CCCD/CMND) vuông góc vào trong khung hình. Đảm bảo ảnh rõ nét, không mờ, không lóa.'
-              )
-            }
-            style={styles.guidelineButton}
-          >
-            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-              <Circle cx={12} cy={12} r={10} stroke="#f8fafc" strokeWidth={2} />
-              <Path
-                d="M12 16v-4"
-                stroke="#f8fafc"
-                strokeWidth={2}
-                strokeLinecap="round"
-              />
-              <Circle cx={12} cy={8} r={1.25} fill="#f8fafc" />
-            </Svg>
-            <Text style={styles.guidelineText}>Xem hướng dẫn</Text>
-          </Pressable>
+              {/* Guideline */}
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  Alert.alert(
+                    'Hướng dẫn',
+                    'Đặt giấy tờ tuỳ thân (CCCD/CMND) vuông góc vào trong khung hình. Đảm bảo ảnh rõ nét, không mờ, không lóa.'
+                  )
+                }
+                style={styles.guidelineButton}
+              >
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <Circle
+                    cx={12}
+                    cy={12}
+                    r={10}
+                    stroke="#f8fafc"
+                    strokeWidth={2}
+                  />
+                  <Path
+                    d="M12 16v-4"
+                    stroke="#f8fafc"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                  />
+                  <Circle cx={12} cy={8} r={1.25} fill="#f8fafc" />
+                </Svg>
+                <Text style={styles.guidelineText}>Xem hướng dẫn</Text>
+              </Pressable>
 
-          {/* Shutter Button */}
-          <View style={styles.shutterContainer}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={handleShutterPress}
-              style={({ pressed }) => [
-                styles.shutterOuter,
-                pressed && styles.shutterOuterPressed,
-              ]}
-            >
-              <View style={styles.shutterInner} />
-            </Pressable>
-          </View>
+              {/* Shutter Button */}
+              <View style={styles.shutterContainer}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleShutterPress}
+                  style={({ pressed }) => [
+                    styles.shutterOuter,
+                    pressed && styles.shutterOuterPressed,
+                  ]}
+                >
+                  <View style={styles.shutterInner} />
+                </Pressable>
+              </View>
+            </>
+          )}
         </View>
       </View>
     </View>
@@ -483,5 +577,55 @@ const styles = StyleSheet.create({
   },
   toggleTextActive: {
     color: '#0f172a',
+  },
+  previewButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    paddingHorizontal: 24,
+    width: '100%',
+    marginBottom: 16,
+  },
+  retakeButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.24)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  retakeButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  confirmButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  confirmButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  cameraHidden: {
+    opacity: 0,
+  },
+  cameraVisible: {
+    opacity: 1,
   },
 });
