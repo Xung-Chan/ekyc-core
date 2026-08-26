@@ -37,6 +37,10 @@ class CardScannerManager private constructor(private val context: Context) {
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     }
 
+    private val tfLiteCardDetector by lazy {
+        TfLiteCardDetector(context)
+    }
+
     @Volatile
     var currentFrameIndex = 0L
         private set
@@ -122,6 +126,18 @@ class CardScannerManager private constructor(private val context: Context) {
     }
 
     fun detectCardCorners(mat: Mat): Array<org.opencv.core.Point>? {
+        // Thử chạy mô hình học máy TfLite trước để định vị góc thẻ
+        try {
+            val tfLiteRes = tfLiteCardDetector.detectFromBgr(mat, 1.0)
+            if (tfLiteRes.points != null && tfLiteRes.points.size == 4) {
+                Log.i(LOG_TAG, "detectCardCorners: TFLite model successfully detected 4 corners!")
+                return tfLiteRes.points.toTypedArray()
+            }
+        } catch (e: Throwable) {
+            Log.w(LOG_TAG, "detectCardCorners: TFLite execution failed, falling back to OpenCV. Error: ${e.message}")
+        }
+
+        // --- Fallback: Thuật toán OpenCV (Canny + Contour) ---
         // 1. Thêm viền đen (padding) 10 pixel xung quanh để xử lý trường hợp thẻ chạm sát mép ảnh crop
         val pad = 10
         val padded = Mat()
@@ -831,15 +847,20 @@ class CardScannerManager private constructor(private val context: Context) {
             return false
         }
 
-        // Nới lỏng biên kiểm định sang biên âm (ngoài vùng crop) tối đa 5 pixel
-        // giúp tránh lỗi khi MinAreaRect hơi mở rộng ra ngoài một chút do bo tròn góc hoặc nhiễu viền
-        val marginX = -5.0
-        val marginY = -5.0
+        // Định cấu hình tỷ lệ biên an toàn (mặc định là 2% theo tài liệu corner_validation_steps.md)
+        val marginFraction = 0.02
         val W = mat.cols().toDouble()
         val H = mat.rows().toDouble()
+        if (W <= 0.0 || H <= 0.0) return false
+
+        val mx = W * marginFraction
+        val my = H * marginFraction
+        val maxX = W - mx
+        val maxY = H - my
+
         for (pt in corners) {
-            if (pt.x <= marginX || pt.x >= (W - marginX) || pt.y <= marginY || pt.y >= (H - marginY)) {
-                Log.i(LOG_TAG, "isDocumentPresent: failed because corner is clipped by margin: x=${pt.x}, y=${pt.y}, W=$W, H=$H")
+            if (pt.x < mx || pt.x > maxX || pt.y < my || pt.y > maxY) {
+                Log.i(LOG_TAG, "isDocumentPresent: failed because corner is clipped by margin (QUAD_OUTSIDE_ROI): x=${pt.x}, y=${pt.y}, W=$W, H=$H, mx=$mx, my=$my")
                 return false
             }
         }
