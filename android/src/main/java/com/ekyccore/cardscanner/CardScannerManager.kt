@@ -122,16 +122,33 @@ class CardScannerManager private constructor(private val context: Context) {
     }
 
     fun detectCardCorners(mat: Mat): Array<org.opencv.core.Point>? {
+        // 1. Thêm viền đen (padding) 10 pixel xung quanh để xử lý trường hợp thẻ chạm sát mép ảnh crop
+        val pad = 10
+        val padded = Mat()
+        Core.copyMakeBorder(mat, padded, pad, pad, pad, pad, Core.BORDER_CONSTANT, org.opencv.core.Scalar(0.0))
+
         val gray = Mat()
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+        Imgproc.cvtColor(padded, gray, Imgproc.COLOR_BGR2GRAY)
+
+        // Tăng cường độ tương phản cục bộ của ảnh xám bằng bộ lọc CLAHE
+        val equalized = Mat()
+        val clahe = Imgproc.createCLAHE(3.0, org.opencv.core.Size(8.0, 8.0))
+        clahe.apply(gray, equalized)
+
         val blurred = Mat()
-        Imgproc.GaussianBlur(gray, blurred, org.opencv.core.Size(5.0, 5.0), 0.0)
+        Imgproc.GaussianBlur(equalized, blurred, org.opencv.core.Size(5.0, 5.0), 0.0)
         val edges = Mat()
-        Imgproc.Canny(blurred, edges, 50.0, 150.0)
+        // Hạ Canny threshold xuống (30.0, 90.0) để nhạy bén hơn với các cạnh mờ/tương phản thấp
+        Imgproc.Canny(blurred, edges, 30.0, 90.0)
+
+        // Phép toán hình thái học MORPH_CLOSE với kernel lớn hơn (9x9) để nối nét đứt biên lớn do bóng/lóa
+        val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, org.opencv.core.Size(9.0, 9.0))
+        val closedEdges = Mat()
+        Imgproc.morphologyEx(edges, closedEdges, Imgproc.MORPH_CLOSE, kernel)
 
         val contours = ArrayList<MatOfPoint>()
         val hierarchy = Mat()
-        Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+        Imgproc.findContours(closedEdges, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
         var maxArea = 0.0
         var bestContour: MatOfPoint? = null
@@ -144,9 +161,16 @@ class CardScannerManager private constructor(private val context: Context) {
         }
 
         var corners: Array<org.opencv.core.Point>? = null
-        if (bestContour != null && maxArea > (mat.cols() * mat.rows() * 0.10)) {
+        val totalArea = mat.cols() * mat.rows()
+        val minAreaThreshold = totalArea * 0.30
+
+        if (bestContour == null) {
+            Log.i(LOG_TAG, "detectCardCorners: failed because bestContour is null")
+        } else if (maxArea <= minAreaThreshold) {
+            Log.i(LOG_TAG, "detectCardCorners: failed because maxArea ($maxArea) <= 30% of image area ($minAreaThreshold)")
+        } else {
             val mop2f = org.opencv.core.MatOfPoint2f(*bestContour.toArray())
-            
+
             // 1. Dùng RotatedRect (minAreaRect) để lấy khung bao hình chữ nhật xoay tối ưu (luôn có 4 đỉnh)
             val minRect = Imgproc.minAreaRect(mop2f)
             val rectWidth = minRect.size.width
@@ -158,28 +182,40 @@ class CardScannerManager private constructor(private val context: Context) {
                 val aspectRatio = longSide / shortSide
                 // Tỷ lệ chuẩn của thẻ ID card là ~1.586. Cho phép khoảng sai số rộng [1.2, 2.1] để bù trừ góc nghiêng phối cảnh
                 val isCardAspectRatio = aspectRatio in 1.2..2.1
-                
+
                 // 3. Tính độ lấp đầy (Solidity / Rectangularity) để loại bỏ nhiễu ngẫu nhiên không phải hình hộp
                 val rectArea = rectWidth * rectHeight
                 val rectangularity = if (rectArea > 0) maxArea / rectArea else 0.0
-                
+
                 // Độ lấp đầy đối với thẻ ID thật thường >= 0.70 (do bo góc tròn và ngón tay che nhẹ)
                 val isRectangularEnough = rectangularity >= 0.70
-                
+
                 if (isCardAspectRatio && isRectangularEnough) {
                     val pts = Array(4) { org.opencv.core.Point() }
                     minRect.points(pts)
+                    
+                    // Trừ đi padding để chuyển tọa độ về đúng hệ tọa độ của ảnh mat gốc ban đầu
+                    for (pt in pts) {
+                        pt.x -= pad
+                        pt.y -= pad
+                    }
                     corners = pts
                 } else {
-                    Log.d(LOG_TAG, "detectCardCorners: failed criteria: aspect=$aspectRatio (ok=$isCardAspectRatio), rectangularity=$rectangularity (ok=$isRectangularEnough)")
+                    Log.i(LOG_TAG, "detectCardCorners: failed criteria: aspect=$aspectRatio (ok=$isCardAspectRatio, expected 1.2..2.1), rectangularity=$rectangularity (ok=$isRectangularEnough, expected >= 0.70)")
                 }
+            } else {
+                Log.i(LOG_TAG, "detectCardCorners: failed because shortSide is 0")
             }
             mop2f.release()
         }
 
+        padded.release()
         gray.release()
+        equalized.release()
         blurred.release()
         edges.release()
+        closedEdges.release()
+        kernel.release()
         hierarchy.release()
         for (c in contours) {
             c.release()
@@ -531,29 +567,36 @@ class CardScannerManager private constructor(private val context: Context) {
             sub = Mat(base, Rect(x, y, w, h))
             cloned = sub.clone()
 
+            var ocrRes: OcrResult? = null
             if (!isDocumentPresent(cloned)) {
-                return CropJpegOnlyResult(
-                    success = false,
-                    croppedAbsolutePath = null,
-                    appliedX = x,
-                    appliedY = y,
-                    appliedW = w,
-                    appliedH = h,
-                    errorCode = "NO_CARD_QUAD",
-                    errorMessage = "Không tìm thấy giấy tờ trong khung hình",
-                    debugDecodedWidth = decW,
-                    debugDecodedHeight = decH,
-                    debugExifOrientation = exifTag,
-                    debugNormalizedWidth = nW ?: decW,
-                    debugNormalizedHeight = nH ?: decH,
-                    debugCropCoordinateSpace = cropCoordinateSpace,
-                    debugBufferOrientation = bufferOrientation,
-                    debugExpectedUprightWidth = if (useUpright) expW else null,
-                    debugExpectedUprightHeight = if (useUpright) expH else null,
-                    debugSkippedUprightRotation = skippedUprightRotate,
-                    debugSourcePhotoWidth = if (useUpright) sourcePhotoWidth else 0,
-                    debugSourcePhotoHeight = if (useUpright) sourcePhotoHeight else 0,
-                )
+                // Thử chạy OCR trước để cứu các trường hợp tìm góc thất bại nhưng ảnh vẫn rõ nét và đọc được
+                val testOcr = runOcrAndSideClassification(cloned, expectedSide)
+                if (!testOcr.success) {
+                    return CropJpegOnlyResult(
+                        success = false,
+                        croppedAbsolutePath = null,
+                        appliedX = x,
+                        appliedY = y,
+                        appliedW = w,
+                        appliedH = h,
+                        errorCode = "NO_CARD_QUAD",
+                        errorMessage = "Không tìm thấy giấy tờ trong khung hình",
+                        debugDecodedWidth = decW,
+                        debugDecodedHeight = decH,
+                        debugExifOrientation = exifTag,
+                        debugNormalizedWidth = nW ?: decW,
+                        debugNormalizedHeight = nH ?: decH,
+                        debugCropCoordinateSpace = cropCoordinateSpace,
+                        debugBufferOrientation = bufferOrientation,
+                        debugExpectedUprightWidth = if (useUpright) expW else null,
+                        debugExpectedUprightHeight = if (useUpright) expH else null,
+                        debugSkippedUprightRotation = skippedUprightRotate,
+                        debugSourcePhotoWidth = if (useUpright) sourcePhotoWidth else 0,
+                        debugSourcePhotoHeight = if (useUpright) sourcePhotoHeight else 0,
+                    )
+                }
+                Log.i(LOG_TAG, "cropJpegOnly: isDocumentPresent failed but OCR succeeded. Bypassing NO_CARD_QUAD check.")
+                ocrRes = testOcr
             }
 
             val qualityError = validateQuality(cloned)
@@ -591,8 +634,8 @@ class CardScannerManager private constructor(private val context: Context) {
                 )
             }
 
-            val ocrRes = runOcrAndSideClassification(cloned, expectedSide)
-            if (!ocrRes.success) {
+            val finalOcrRes = ocrRes ?: runOcrAndSideClassification(cloned, expectedSide)
+            if (!finalOcrRes.success) {
                 return CropJpegOnlyResult(
                     success = false,
                     croppedAbsolutePath = null,
@@ -600,8 +643,8 @@ class CardScannerManager private constructor(private val context: Context) {
                     appliedY = y,
                     appliedW = w,
                     appliedH = h,
-                    errorCode = ocrRes.errorCode ?: "OCR_FAILED",
-                    errorMessage = ocrRes.errorMessage ?: "OCR validation failed",
+                    errorCode = finalOcrRes.errorCode ?: "OCR_FAILED",
+                    errorMessage = finalOcrRes.errorMessage ?: "OCR validation failed",
                     debugDecodedWidth = decW,
                     debugDecodedHeight = decH,
                     debugExifOrientation = exifTag,
@@ -667,9 +710,9 @@ class CardScannerManager private constructor(private val context: Context) {
                 debugSkippedUprightRotation = if (useUpright) skippedUprightRotate else false,
                 debugSourcePhotoWidth = if (useUpright) sourcePhotoWidth else 0,
                 debugSourcePhotoHeight = if (useUpright) sourcePhotoHeight else 0,
-                side = ocrRes.side,
-                sideFrontScore = ocrRes.frontScore,
-                sideBackScore = ocrRes.backScore,
+                side = finalOcrRes.side,
+                sideFrontScore = finalOcrRes.frontScore,
+                sideBackScore = finalOcrRes.backScore,
                 blurScore = finalBlur,
                 glarePercent = finalGlare
             )
@@ -782,37 +825,16 @@ class CardScannerManager private constructor(private val context: Context) {
     // --- Quality Assessment Logic (merged from pipeline) ---
 
     fun isDocumentPresent(mat: Mat): Boolean {
-        val gray = Mat()
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
-
-        val blurred = Mat()
-        Imgproc.GaussianBlur(gray, blurred, org.opencv.core.Size(5.0, 5.0), 0.0)
-
-        val edges = Mat()
-        Imgproc.Canny(blurred, edges, 50.0, 150.0)
-
-        val nonZeroCount = Core.countNonZero(edges)
-        val totalPixels = edges.cols() * edges.rows()
-        val edgeDensity = nonZeroCount.toDouble() / totalPixels
-
-        gray.release()
-        blurred.release()
-        edges.release()
-
-        if (edgeDensity < 0.003) {
-            return false
-        }
-
         val corners = detectCardCorners(mat)
         if (corners == null || corners.size != 4) {
-            Log.i(LOG_TAG, "isDocumentPresent: failed because detected corners is not 4")
+            Log.i(LOG_TAG, "isDocumentPresent: failed because detected corners is not 4 (count)")
             return false
         }
 
-        // Nới lỏng biên kiểm định sang biên âm (ngoài vùng crop) tối đa 15 pixel
+        // Nới lỏng biên kiểm định sang biên âm (ngoài vùng crop) tối đa 5 pixel
         // giúp tránh lỗi khi MinAreaRect hơi mở rộng ra ngoài một chút do bo tròn góc hoặc nhiễu viền
-        val marginX = -15.0
-        val marginY = -15.0
+        val marginX = -5.0
+        val marginY = -5.0
         val W = mat.cols().toDouble()
         val H = mat.rows().toDouble()
         for (pt in corners) {

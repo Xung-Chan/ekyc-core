@@ -16,9 +16,11 @@ import {
   type CardScannerCameraViewRef,
   type ScanCardResult,
 } from '@xungchan/ekyc-core';
+import { useIsFocused } from '@react-navigation/native';
 import { useEkycVM } from '../viewmodels/cccdCaptureVM';
 
 export default function CCCDCapture() {
+  const isFocused = useIsFocused();
   const cardCameraRef = useRef<CardScannerCameraViewRef>(null);
   const { setFrontImage, setBackImage, navigateToPreview } = useEkycVM();
 
@@ -176,7 +178,7 @@ export default function CCCDCapture() {
           <CardScannerCameraView
             ref={cardCameraRef}
             style={StyleSheet.absoluteFill}
-            isActive={previewPath ? false : true}
+            isActive={isFocused && !previewPath}
             expectedSide={currentSide}
             onPhotoCaptured={handlePhotoCaptured}
             autocapture={isAuto && !retakeLock}

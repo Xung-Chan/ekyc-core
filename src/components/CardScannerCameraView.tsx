@@ -37,6 +37,7 @@ import {
   computePhotoRawCropRectForCardScan,
   type ManualPhotoCropPlan,
   type Orientation,
+  type Rect,
 } from '../modules/photoGuideCropRect';
 import { scanCardFrame } from '../modules/scanCardFrame';
 import type { ScanCardResult } from '../type';
@@ -141,7 +142,7 @@ const CardScannerCameraInner = forwardRef<
       setPreviewSize({ width, height });
     }, []);
 
-    const overlayGuide = useMemo(
+    const overlayGuide: Rect = useMemo(
       () =>
         computeCardScannerGuideRectInPreview({
           previewWidth: previewSize.width,
@@ -157,14 +158,12 @@ const CardScannerCameraInner = forwardRef<
       ]
     );
 
+    //stroke guide color
     const [isDocDetected, setIsDocDetected] = useState(false);
-
-    const updateDocDetected = useRunOnJS((detected: boolean) => {
-      setIsDocDetected(detected);
-    }, []);
 
     const onFrameValidatedJS = useRunOnJS(
       (isDocumentPresent: boolean, blurScore: number, glarePercent: number) => {
+        setIsDocDetected(isDocumentPresent);
         if (onFrameValidated) {
           onFrameValidated({ isDocumentPresent, blurScore, glarePercent });
         }
@@ -186,6 +185,7 @@ const CardScannerCameraInner = forwardRef<
           if (event.success && event.croppedImagePath) {
             captureLockRef.current = true;
             setBusy(true);
+            // todo: check result
             const scanResult: ScanCardResult = {
               success: true,
               originalImagePath: event.croppedImagePath,
@@ -211,7 +211,7 @@ const CardScannerCameraInner = forwardRef<
                 : undefined,
               manualCaptureDebugSavedToGallery: false,
             };
-            await onPhotoCaptured?.(event.croppedImagePath, scanResult);
+            onPhotoCaptured?.(event.croppedImagePath, scanResult);
             captureLockRef.current = false;
             setBusy(false);
           } else if (!event.success) {
@@ -251,7 +251,6 @@ const CardScannerCameraInner = forwardRef<
       (frame) => {
         'worklet';
         if (busy || captureLockRef.current) {
-          updateDocDetected(false);
           onFrameValidatedJS(false, 0, 0);
           return;
         }
@@ -271,18 +270,16 @@ const CardScannerCameraInner = forwardRef<
         });
 
         if (result) {
-          updateDocDetected(result.isDocumentPresent);
           onFrameValidatedJS(
             result.isDocumentPresent,
             result.blurScore,
             result.glarePercent
           );
         } else {
-          updateDocDetected(false);
           onFrameValidatedJS(false, 0, 0);
         }
       },
-      [previewSize, overlayGuide, busy, updateDocDetected, onFrameValidatedJS]
+      [previewSize, overlayGuide, busy, onFrameValidatedJS]
     );
 
     useEffect(() => {
