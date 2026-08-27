@@ -18,8 +18,8 @@ export interface ScanCardFrameParams {
 
 export interface ScanFrameResult {
   isDocumentPresent: boolean;
-  blurScore: number;
-  glarePercent: number;
+  errorCode: string;
+  errorMessage: string;
 }
 
 export function scanCardFrame(

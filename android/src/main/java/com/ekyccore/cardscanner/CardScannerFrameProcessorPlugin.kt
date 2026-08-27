@@ -63,8 +63,8 @@ class CardScannerFrameProcessorPlugin(
       bgrMat.release()
       return hashMapOf(
         "isDocumentPresent" to true,
-        "blurScore" to 150.0,
-        "glarePercent" to 0.0
+        "errorCode" to "",
+        "errorMessage" to ""
       )
     }
 
@@ -173,10 +173,27 @@ class CardScannerFrameProcessorPlugin(
       }
     }
 
+    val errCode: String
+    val errMsg: String
+
+    if (!isDoc) {
+      errCode = "DOCUMENT_NOT_PRESENT"
+      errMsg = "Đặt giấy tờ vào khung hình"
+    } else if (blurVal < blurThreshold) {
+      errCode = "IMAGE_TOO_BLURRY"
+      errMsg = "Hình ảnh bị mờ, vui lòng giữ yên thiết bị"
+    } else if (glarePct > glareThreshold) {
+      errCode = "IMAGE_HAS_GLARE"
+      errMsg = "Hình ảnh bị lóa sáng, vui lòng điều chỉnh góc chụp"
+    } else {
+      errCode = ""
+      errMsg = ""
+    }
+
     return hashMapOf(
       "isDocumentPresent" to isDoc,
-      "blurScore" to blurVal,
-      "glarePercent" to glarePct
+      "errorCode" to errCode,
+      "errorMessage" to errMsg
     )
   }
 

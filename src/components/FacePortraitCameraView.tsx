@@ -28,7 +28,7 @@ import type {
   FacePortraitCameraViewProps,
   FacePortraitCameraViewRef,
   FacePortraitCaptureEvent,
-} from '../type';
+} from '../types';
 
 const SCREEN = Dimensions.get('window');
 

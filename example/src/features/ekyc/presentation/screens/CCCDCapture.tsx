@@ -15,6 +15,7 @@ import {
   CardScannerCameraView,
   type CardScannerCameraViewRef,
   type ScanCardResult,
+  type ScanFrameResult,
 } from '@xungchan/ekyc-core';
 import { useIsFocused } from '@react-navigation/native';
 import { useEkycVM } from '../viewmodels/cccdCaptureVM';
@@ -35,26 +36,17 @@ export default function CCCDCapture() {
   const [previewPath, setPreviewPath] = useState<string | null>(null);
   const [retakeLock, setRetakeLock] = useState(false);
 
-  const handleFrameValidated = (result: {
-    isDocumentPresent: boolean;
-    blurScore: number;
-    glarePercent: number;
-  }) => {
+  const handleFrameValidated = (result: ScanFrameResult) => {
     if (hintLock) return;
 
     if (!result.isDocumentPresent) {
       setValidationHint({
-        text: 'Đặt giấy tờ vào khung hình',
+        text: result.errorMessage || 'Đặt giấy tờ vào khung hình',
         type: 'neutral',
       });
-    } else if (result.blurScore < 150) {
+    } else if (result.errorCode) {
       setValidationHint({
-        text: 'Hình ảnh bị mờ, vui lòng giữ yên thiết bị',
-        type: 'warning',
-      });
-    } else if (result.glarePercent > 0.05) {
-      setValidationHint({
-        text: 'Hình ảnh bị lóa sáng, vui lòng điều chỉnh góc chụp',
+        text: result.errorMessage || 'Chất lượng hình ảnh không đạt yêu cầu',
         type: 'warning',
       });
     } else {
