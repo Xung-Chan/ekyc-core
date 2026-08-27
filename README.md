@@ -31,7 +31,7 @@ Vì thư viện sử dụng Camera (qua `react-native-vision-camera`), bạn c�
 ## Tính năng
 
 - [x] **Ekyc CardScanner Manual (Quét giấy tờ thủ công)**: Hiển thị khung camera chụp giấy tờ, cho phép người dùng bấm nút chụp và tự động crop, kiểm tra chất lượng hình ảnh (mờ, lóa, độ phơi sáng) cũng như nhận diện mặt trước/sau.
-- [ ] **Ekyc CardScanner Auto-Capture (Quét giấy tờ tự động)** (*Đang trong quá trình phát triển*)
+- [x] **Ekyc CardScanner Auto-Capture (Quét giấy tờ tự động)** (*Đang trong quá trình phát triển*)
 - [ ] **Ekyc FacePortrait Scanner (Nhận diện & quét khuôn mặt)** (*Đang trong quá trình phát triển*)
 
 ---

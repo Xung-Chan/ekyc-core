@@ -13,12 +13,13 @@ export interface ScanCardFrameParams {
   throttleMs?: number;
   blurThreshold?: number;
   glareThreshold?: number;
+  expectedSide?: string;
 }
 
 export interface ScanFrameResult {
   isDocumentPresent: boolean;
-  blurScore: number;
-  glarePercent: number;
+  errorCode: string;
+  errorMessage: string;
 }
 
 export function scanCardFrame(

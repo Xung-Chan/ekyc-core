@@ -65,7 +65,8 @@ data class CropCardImageOnlyParams(
     val bufferOrientation: String?,
     val sourcePhotoWidth: Int,
     val sourcePhotoHeight: Int,
-    val manualCaptureDebugSaveToGallery: Boolean
+    val manualCaptureDebugSaveToGallery: Boolean,
+    val expectedSide: String?
 ) {
     companion object {
         private const val IMAGE_PATH = "imagePath"
@@ -75,6 +76,7 @@ data class CropCardImageOnlyParams(
         private const val SOURCE_PHOTO_WIDTH = "sourcePhotoWidth"
         private const val SOURCE_PHOTO_HEIGHT = "sourcePhotoHeight"
         private const val MANUAL_CAPTURE_DEBUG_SAVE_TO_GALLERY = "manualCaptureDebugSaveToGallery"
+        private const val EXPECTED_SIDE = "expectedSide"
 
         fun fromReadableMap(map: ReadableMap): CropCardImageOnlyParams {
             val rawPath = if (map.hasKey(IMAGE_PATH) && !map.isNull(IMAGE_PATH)) {
@@ -97,6 +99,9 @@ data class CropCardImageOnlyParams(
             val sourcePhotoWidth = readBufferDimension(map, SOURCE_PHOTO_WIDTH)
             val sourcePhotoHeight = readBufferDimension(map, SOURCE_PHOTO_HEIGHT)
             val manualCaptureDebugSaveToGallery = readOptionalBool(map, MANUAL_CAPTURE_DEBUG_SAVE_TO_GALLERY)
+            val expectedSide = if (map.hasKey(EXPECTED_SIDE) && !map.isNull(EXPECTED_SIDE)) {
+                map.getString(EXPECTED_SIDE)
+            } else null
 
             return CropCardImageOnlyParams(
                 imagePath = path,
@@ -105,7 +110,8 @@ data class CropCardImageOnlyParams(
                 bufferOrientation = bufferOrientation,
                 sourcePhotoWidth = sourcePhotoWidth,
                 sourcePhotoHeight = sourcePhotoHeight,
-                manualCaptureDebugSaveToGallery = manualCaptureDebugSaveToGallery
+                manualCaptureDebugSaveToGallery = manualCaptureDebugSaveToGallery,
+                expectedSide = expectedSide
             )
         }
 

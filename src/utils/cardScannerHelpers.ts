@@ -1,4 +1,4 @@
-import type { CropCardImageOnlyResult, ScanCardResult } from '../type';
+import type { CropCardImageOnlyResult, ScanCardResult } from '../types';
 
 export function lBracketPathRoundTopLeft(
   hx: number,
@@ -69,14 +69,14 @@ export function manualCropOnlyToScanResult(
     success: r.success,
     originalImagePath: r.originalImagePath || originalPath,
     croppedImagePath: r.croppedImagePath,
-    side: expectedSide ?? 'unknown',
-    sideFrontScore: 0,
-    sideBackScore: 0,
+    side: r.side || expectedSide || 'unknown',
+    sideFrontScore: r.sideFrontScore ?? 0,
+    sideBackScore: r.sideBackScore ?? 0,
     quality: {
       passed: r.success,
-      blurScore: 0,
+      blurScore: r.blurScore ?? 0,
       motionScore: 0,
-      glareScore: 0,
+      glareScore: (r.glarePercent ?? 0) * 100,
       exposure: 'ok',
       reasons: r.success ? [] : [r.errorCode ?? 'CROP_FAILED'],
     },

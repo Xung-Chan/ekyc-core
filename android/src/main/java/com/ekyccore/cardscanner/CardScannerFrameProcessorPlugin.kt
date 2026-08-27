@@ -2,6 +2,7 @@ package com.ekyccore.cardscanner
 
 import android.graphics.ImageFormat
 import android.media.Image
+import android.util.Log
 import com.mrousavy.camera.core.FrameInvalidError
 import com.mrousavy.camera.frameprocessors.Frame
 import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
@@ -53,6 +54,20 @@ class CardScannerFrameProcessorPlugin(
 
     lastProcessedTimestamp = now
 
+    val manager = CardScannerManager.getInstance(proxy.context)
+    manager.incrementFrameIndex()
+
+    val frameIndex = manager.currentFrameIndex
+    val isStableCached = manager.hasValidCachedResult(30000L)
+    if (isStableCached && frameIndex % 5 != 0L) {
+      bgrMat.release()
+      return hashMapOf(
+        "isDocumentPresent" to true,
+        "errorCode" to "",
+        "errorMessage" to ""
+      )
+    }
+
     // Extract layout guidelines and quality parameters
     val previewWidth = (arguments["previewWidth"] as? Number)?.toDouble() ?: 0.0
     val previewHeight = (arguments["previewHeight"] as? Number)?.toDouble() ?: 0.0
@@ -63,15 +78,15 @@ class CardScannerFrameProcessorPlugin(
     val bufferOrientation = arguments["bufferOrientation"] as? String ?: "portrait"
     val blurThreshold = (arguments["blurThreshold"] as? Number)?.toDouble() ?: 150.0
     val glareThreshold = (arguments["glareThreshold"] as? Number)?.toDouble() ?: 0.05
+    val expectedSide = arguments["expectedSide"] as? String
 
     var uprightMat: Mat? = null
     var croppedMat: Mat? = null
     var passedAllThresholds = false
+    var scheduledAsync = false
     var isDoc = false
     var blurVal = 0.0
     var glarePct = 0.0
-
-    val manager = CardScannerManager.getInstance(proxy.context)
 
     try {
       uprightMat = normalizeToUprightMat(bgrMat, bufferOrientation)
@@ -111,12 +126,27 @@ class CardScannerFrameProcessorPlugin(
       croppedMat = Mat(uprightMat, org.opencv.core.Rect(cropX, cropY, cropW, cropH))
 
       isDoc = manager.isDocumentPresent(croppedMat)
+      if (isDoc) {
+        manager.checkCardStability(croppedMat)
+      } else {
+        manager.clearCorners()
+        manager.clearCache()
+      }
+
       blurVal = manager.computeBlurScore(croppedMat)
       glarePct = manager.computeGlarePercent(croppedMat)
 
       passedAllThresholds = isDoc && blurVal >= blurThreshold && glarePct <= glareThreshold
+      val canStartOcr = (now - manager.lastOcrExecutionTime) >= 500L
 
-      if (passedAllThresholds) {
+      if (isDoc) {
+        Log.i("EkycCardScanner", "Frame validation: blurVal=$blurVal (threshold=$blurThreshold), glarePct=$glarePct (threshold=$glareThreshold), canStartOcr=$canStartOcr, passedAll=$passedAllThresholds")
+      }
+
+      if (passedAllThresholds && canStartOcr) {
+        Log.i("EkycCardScanner", "passedAllThresholds is TRUE, scheduling saveAndCropCardAsync for frame $frameIndex")
+        manager.lastOcrExecutionTime = now
+        scheduledAsync = true
         // Delegate heavy cropping/saving task asynchronously to CardScannerManager
         manager.saveAndCropCardAsync(
           bgrMat = bgrMat,
@@ -128,7 +158,9 @@ class CardScannerFrameProcessorPlugin(
           guideHeight = guideHeight,
           bufferOrientation = bufferOrientation,
           blurVal = blurVal,
-          glarePct = glarePct
+          glarePct = glarePct,
+          expectedSide = expectedSide,
+          frameIndex = frameIndex
         )
       }
     } catch (_: Exception) {
@@ -136,15 +168,32 @@ class CardScannerFrameProcessorPlugin(
     } finally {
       croppedMat?.release()
       uprightMat?.release()
-      if (!passedAllThresholds) {
-        bgrMat.release() // If it doesn't pass, we release the Mat synchronously right here!
+      if (!scheduledAsync) {
+        bgrMat.release() // If it doesn't pass or scheduled, release Mat!
       }
+    }
+
+    val errCode: String
+    val errMsg: String
+
+    if (!isDoc) {
+      errCode = "DOCUMENT_NOT_PRESENT"
+      errMsg = "Đặt giấy tờ vào khung hình"
+    } else if (blurVal < blurThreshold) {
+      errCode = "IMAGE_TOO_BLURRY"
+      errMsg = "Hình ảnh bị mờ, vui lòng giữ yên thiết bị"
+    } else if (glarePct > glareThreshold) {
+      errCode = "IMAGE_HAS_GLARE"
+      errMsg = "Hình ảnh bị lóa sáng, vui lòng điều chỉnh góc chụp"
+    } else {
+      errCode = ""
+      errMsg = ""
     }
 
     return hashMapOf(
       "isDocumentPresent" to isDoc,
-      "blurScore" to blurVal,
-      "glarePercent" to glarePct
+      "errorCode" to errCode,
+      "errorMessage" to errMsg
     )
   }
 

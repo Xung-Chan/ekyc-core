@@ -1,5 +1,3 @@
-import { TurboModuleRegistry, type TurboModule } from 'react-native';
-
 export interface CropRect {
   x: number;
   y: number;
@@ -7,18 +5,19 @@ export interface CropRect {
   height: number;
 }
 
-export interface CropCardImageOnlyParams {
+export type CropCardImageOnlyParams = {
   imagePath: string;
   crop: CropRect;
-  cropCoordinateSpace?: string;
-  bufferOrientation?: string;
+  cropCoordinateSpace?: 'raw' | 'upright';
+  bufferOrientation?:
+    'portrait' | 'portrait-upside-down' | 'landscape-left' | 'landscape-right';
   sourcePhotoWidth?: number;
   sourcePhotoHeight?: number;
   manualCaptureDebugSaveToGallery?: boolean;
-  expectedSide?: string;
-}
+  expectedSide?: 'front' | 'back';
+};
 
-export interface CropCardImageOnlyDebug {
+export type CropCardImageOnlyDebug = {
   cropCoordinateSpace: string;
   decodedWidth: number;
   decodedHeight: number;
@@ -31,9 +30,9 @@ export interface CropCardImageOnlyDebug {
   skippedUprightRotation: boolean;
   sourcePhotoWidth?: number;
   sourcePhotoHeight?: number;
-}
+};
 
-export interface CropCardImageOnlyResult {
+export type CropCardImageOnlyResult = {
   success: boolean;
   originalImagePath: string;
   croppedImagePath?: string;
@@ -47,21 +46,25 @@ export interface CropCardImageOnlyResult {
   sideBackScore?: number;
   blurScore?: number;
   glarePercent?: number;
-}
+};
 
-export interface CleanUpResult {
-  deleted: number;
-  skipped: number;
-}
-
-export interface Spec extends TurboModule {
-  cropCardImageOnly(
-    params: CropCardImageOnlyParams
-  ): Promise<CropCardImageOnlyResult>;
-  deleteLocalImages(paths: string[]): Promise<CleanUpResult>;
-  scrubCardScannerTempFiles(exclude: string[] | null): Promise<CleanUpResult>;
-  addListener(eventName: string): void;
-  removeListeners(count: number): void;
-}
-
-export default TurboModuleRegistry.getEnforcing<Spec>('CardScanner');
+export type ScanCardResult = {
+  success: boolean;
+  originalImagePath: string;
+  croppedImagePath?: string;
+  side: string;
+  sideFrontScore: number;
+  sideBackScore: number;
+  quality: {
+    passed: boolean;
+    blurScore: number;
+    motionScore: number;
+    glareScore: number;
+    exposure: string;
+    reasons: string[];
+  };
+  appliedCrop?: CropRect;
+  manualCaptureDebugSavedToGallery: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+};
