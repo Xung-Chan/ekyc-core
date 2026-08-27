@@ -31,7 +31,7 @@ Vì thư viện sử dụng Camera (qua `react-native-vision-camera`), bạn c�
 ## Tính năng
 
 - [x] **Ekyc CardScanner Manual (Quét giấy tờ thủ công)**: Hiển thị khung camera chụp giấy tờ, cho phép người dùng bấm nút chụp và tự động crop, kiểm tra chất lượng hình ảnh (mờ, lóa, độ phơi sáng) cũng như nhận diện mặt trước/sau.
-- [x] **Ekyc CardScanner Auto-Capture (Quét giấy tờ tự động)** (*Đang trong quá trình phát triển*)
+- [x] **Ekyc CardScanner Auto-Capture (Quét giấy tờ tự động)**: Tự động phát hiện giấy tờ, kiểm tra chất lượng thời gian thực (độ mờ, lóa) và thực hiện chụp tự động khi các điều kiện chất lượng đạt yêu cầu.
 - [ ] **Ekyc FacePortrait Scanner (Nhận diện & quét khuôn mặt)** (*Đang trong quá trình phát triển*)
 
 ---
@@ -165,12 +165,13 @@ const styles = StyleSheet.create({
 | Tên Prop | Kiểu dữ liệu | Mặc định | Mô tả |
 | :--- | :--- | :--- | :--- |
 | `isActive` | `boolean` | `true` | Điều khiển việc bật/tắt camera session. |
-| `autocapture` | `boolean` | `false` | `false` cho chế độ chụp thủ công (Manual). |
+| `autocapture` | `boolean` | `false` | Bật/tắt chế độ tự động chụp (Auto-capture). |
 | `expectedSide` | `'front' \| 'back'` | `undefined` | Mặt giấy tờ mong muốn quét. |
 | `showGuide` | `boolean` | `true` | Bật/tắt khung viền chữ L và mặt nạ tối màu ở ngoài vùng quét. |
 | `guideFrame` | `object` | `{ widthFraction: 0.86, aspectRatio: 1.586 }` | Điều chỉnh tỷ lệ kích thước khung hướng dẫn. |
 | `targetFps` | `number` | `24` | Thiết lập FPS cho camera. |
 | `onPhotoCaptured` | `(imagePath: string, scanResult: ScanCardResult) => void` | `undefined` | Callback được gọi sau khi chụp ảnh và xử lý thành công. |
+| `onFrameValidated` | `(result: ScanFrameResult) => void` | `undefined` | Callback phản hồi chất lượng frame thời gian thực khi ở chế độ chụp tự động. |
 | `style` | `ViewStyle` | `undefined` | Style áp dụng cho view camera. |
 
 #### Ref Methods
@@ -204,6 +205,99 @@ type ScanCardResult = {
   errorCode?: string;             // Mã lỗi nếu có
   errorMessage?: string;          // Chi tiết lỗi
 };
+```
+
+#### ScanFrameResult
+
+Kết quả phân tích khung hình (frame) thời gian thực trong chế độ chụp tự động:
+
+```typescript
+export interface ScanFrameResult {
+  isDocumentPresent: boolean;     // Xác định có giấy tờ trong khung hình hay không
+  errorCode: string;              // Mã lỗi kiểm tra chất lượng (ví dụ: "IMAGE_TOO_BLURRY", "IMAGE_HAS_GLARE", "DOCUMENT_NOT_PRESENT")
+  errorMessage: string;           // Thông báo lỗi chi tiết tương ứng hiển thị lên UI
+}
+```
+
+---
+
+## Hướng dẫn sử dụng Ekyc CardScanner Auto-Capture
+
+Tính năng quét giấy tờ tự động sử dụng component `<CardScannerCameraView>` với prop `autocapture={true}`. Component sẽ tự động gửi từng frame qua Native module để phân tích độ hiện diện của thẻ, độ mờ, độ lóa và trả về kết quả thời gian thực qua callback `onFrameValidated`. Khi frame đạt chuẩn, Native module tự động kích hoạt chụp và crop, kết quả cuối cùng trả qua `onPhotoCaptured`.
+
+### Code ví dụ chi tiết cho Auto-Capture
+
+```tsx
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, Alert } from 'react-native';
+import { 
+  CardScannerCameraView, 
+  type ScanCardResult,
+  type ScanFrameResult 
+} from '@xungchan/ekyc-core';
+
+export default function AutoCaptureScreen() {
+  const [hint, setHint] = useState('Đặt giấy tờ vào khung hình');
+  const [hintType, setHintType] = useState<'neutral' | 'warning' | 'success'>('neutral');
+
+  const handleFrameValidated = (result: ScanFrameResult) => {
+    if (!result.isDocumentPresent) {
+      setHint('Đặt giấy tờ vào khung hình');
+      setHintType('neutral');
+    } else if (result.errorCode) {
+      setHint(result.errorMessage || 'Chất lượng hình ảnh không đạt yêu cầu');
+      setHintType('warning');
+    } else {
+      setHint('Giữ nguyên để tự động chụp...');
+      setHintType('success');
+    }
+  };
+
+  const handlePhotoCaptured = (imagePath: string, scanResult: ScanCardResult) => {
+    if (!scanResult.success) {
+      Alert.alert('Lỗi', scanResult.errorMessage || 'Nhận diện thất bại');
+      return;
+    }
+    Alert.alert('Thành công', 'Đã chụp tự động thành công!');
+  };
+
+  return (
+    <View style={styles.container}>
+      <CardScannerCameraView
+        style={StyleSheet.absoluteFill}
+        isActive={true}
+        autocapture={true} // Bật tự động chụp
+        onFrameValidated={handleFrameValidated}
+        onPhotoCaptured={handlePhotoCaptured}
+      />
+      <View style={styles.hintContainer}>
+        <Text style={[styles.hintText, styles[hintType]]}>{hint}</Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  hintContainer: {
+    position: 'absolute',
+    bottom: 50,
+    alignSelf: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  hintText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  neutral: { color: '#ffffff' },
+  warning: { color: '#ffcc00' },
+  success: { color: '#4cd964' },
+});
 ```
 
 ---
