@@ -142,7 +142,7 @@ export function useCardScannerCapture({
         bufferOrientation: frame.orientation,
         throttleMs: 150,
         blurThreshold: 150.0,
-        glareThreshold: 0.05,
+        glareThreshold: 0.08,
         expectedSide: expectedSide,
       });
 
@@ -156,7 +156,7 @@ export function useCardScannerCapture({
         onFrameValidatedJS(false, '', '');
       }
     },
-    [previewSize, overlayGuide, busy, onFrameValidatedJS]
+    [previewSize, overlayGuide, busy, onFrameValidatedJS, expectedSide]
   );
 
   const takePhoto = useCallback(async (): Promise<string | null> => {

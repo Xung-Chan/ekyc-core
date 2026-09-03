@@ -77,7 +77,7 @@ class CardScannerFrameProcessorPlugin(
     val guideHeight = (arguments["guideHeight"] as? Number)?.toDouble() ?: 0.0
     val bufferOrientation = arguments["bufferOrientation"] as? String ?: "portrait"
     val blurThreshold = (arguments["blurThreshold"] as? Number)?.toDouble() ?: 150.0
-    val glareThreshold = (arguments["glareThreshold"] as? Number)?.toDouble() ?: 0.05
+    val glareThreshold = (arguments["glareThreshold"] as? Number)?.toDouble() ?: 0.08
     val expectedSide = arguments["expectedSide"] as? String
 
     var uprightMat: Mat? = null
