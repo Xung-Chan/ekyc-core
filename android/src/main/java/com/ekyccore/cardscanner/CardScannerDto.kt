@@ -199,3 +199,11 @@ data class CropCardImageOnlyResult(
         }
     }
 }
+data class OcrResult(
+    val success: Boolean,
+    val side: String,
+    val frontScore: Double,
+    val backScore: Double,
+    val errorCode: String?,
+    val errorMessage: String?
+)

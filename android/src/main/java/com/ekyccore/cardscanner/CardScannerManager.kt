@@ -193,7 +193,7 @@ class CardScannerManager private constructor(private val context: Context) {
                 if (isCardAspectRatio && isRectangularEnough) {
                     val pts = Array(4) { org.opencv.core.Point() }
                     minRect.points(pts)
-                    
+
                     // Trừ đi padding để chuyển tọa độ về đúng hệ tọa độ của ảnh mat gốc ban đầu
                     for (pt in pts) {
                         pt.x -= pad
@@ -1100,14 +1100,7 @@ class CardScannerManager private constructor(private val context: Context) {
         }
     }
 
-    data class OcrResult(
-        val success: Boolean,
-        val side: String,
-        val frontScore: Double,
-        val backScore: Double,
-        val errorCode: String?,
-        val errorMessage: String?
-    )
+
 
     fun runOcrAndSideClassification(mat: Mat, expectedSide: String?): OcrResult {
         val bmp = try {
