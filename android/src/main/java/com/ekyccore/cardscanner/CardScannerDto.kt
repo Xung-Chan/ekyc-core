@@ -49,6 +49,7 @@ data class CropRect(
                         val v = params.getDouble(key)
                         if (!v.isFinite() || v < 1) 0 else v.toInt().coerceIn(1, 8192)
                     }
+
                     else -> params.getInt(key).coerceAtLeast(0)
                 }
             } catch (_: Throwable) {
@@ -135,6 +136,7 @@ data class CropCardImageOnlyParams(
                         val v = params.getDouble(key)
                         if (!v.isFinite() || v < 1) 0 else v.toInt().coerceIn(1, 8192)
                     }
+
                     else -> params.getInt(key).coerceAtLeast(0)
                 }
             } catch (_: Throwable) {
@@ -199,6 +201,7 @@ data class CropCardImageOnlyResult(
         }
     }
 }
+
 data class OcrResult(
     val success: Boolean,
     val side: String,
@@ -207,3 +210,37 @@ data class OcrResult(
     val errorCode: String?,
     val errorMessage: String?
 )
+
+
+data class ScanCardFrameParams(
+    val previewWidth: Double = 0.0,
+    val previewHeight: Double = 0.0,
+    val guideX: Double = 0.0,
+    val guideY: Double = 0.0,
+    val guideWidth: Double = 0.0,
+    val guideHeight: Double = 0.0,
+    val bufferOrientation: String = "portrait",
+    val throttleMs: Long = 200L,
+    val blurThreshold: Double = 150.0,
+    val glareThreshold: Double = 0.08,
+    val expectedSide: String? = null
+) {
+    companion object {
+        fun fromMap(arguments: Map<String, Any>?): ScanCardFrameParams {
+            if (arguments == null) return ScanCardFrameParams()
+            return ScanCardFrameParams(
+                previewWidth = (arguments["previewWidth"] as? Number)?.toDouble() ?: 0.0,
+                previewHeight = (arguments["previewHeight"] as? Number)?.toDouble() ?: 0.0,
+                guideX = (arguments["guideX"] as? Number)?.toDouble() ?: 0.0,
+                guideY = (arguments["guideY"] as? Number)?.toDouble() ?: 0.0,
+                guideWidth = (arguments["guideWidth"] as? Number)?.toDouble() ?: 0.0,
+                guideHeight = (arguments["guideHeight"] as? Number)?.toDouble() ?: 0.0,
+                bufferOrientation = arguments["bufferOrientation"] as? String ?: "portrait",
+                throttleMs = (arguments["throttleMs"] as? Number)?.toLong() ?: 200L,
+                blurThreshold = (arguments["blurThreshold"] as? Number)?.toDouble() ?: 150.0,
+                glareThreshold = (arguments["glareThreshold"] as? Number)?.toDouble() ?: 0.08,
+                expectedSide = arguments["expectedSide"] as? String
+            )
+        }
+    }
+}
