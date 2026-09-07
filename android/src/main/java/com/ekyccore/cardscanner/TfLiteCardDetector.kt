@@ -44,7 +44,7 @@ class TfLiteCardDetector(context: Context) {
         val outMap = HashMap<Int, Any>(4)
         try {
             buf = loadMappedModel(context, MODEL_ASSET_PATH)
-            val options = Interpreter.Options().setNumThreads(4).apply {
+            val options = Interpreter.Options().setNumThreads(2).apply {
                 try {
                     setUseNNAPI(true)
                 } catch (_: Throwable) {}

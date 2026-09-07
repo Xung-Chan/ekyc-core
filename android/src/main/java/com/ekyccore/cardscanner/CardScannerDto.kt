@@ -244,3 +244,69 @@ data class ScanCardFrameParams(
         }
     }
 }
+
+sealed interface CardCapturedEvent {
+    val success: Boolean
+    fun toWritableMap(): WritableMap
+
+    data class Success(
+        val croppedImagePath: String,
+        val blurScore: Double,
+        val glarePercent: Double,
+        val side: String,
+        val sideFrontScore: Double,
+        val sideBackScore: Double,
+        val appliedCrop: CropRect
+    ) : CardCapturedEvent {
+        override val success: Boolean = true
+
+        constructor(
+            croppedImagePath: String,
+            blurScore: Double,
+            glarePercent: Double,
+            appliedX: Int,
+            appliedY: Int,
+            appliedWidth: Int,
+            appliedHeight: Int,
+            side: String,
+            sideFrontScore: Double,
+            sideBackScore: Double
+        ) : this(
+            croppedImagePath = croppedImagePath,
+            blurScore = blurScore,
+            glarePercent = glarePercent,
+            side = side,
+            sideFrontScore = sideFrontScore,
+            sideBackScore = sideBackScore,
+            appliedCrop = CropRect(appliedX, appliedY, appliedWidth, appliedHeight)
+        )
+
+        override fun toWritableMap(): WritableMap {
+            return Arguments.createMap().apply {
+                putBoolean("success", true)
+                putString("croppedImagePath", croppedImagePath)
+                putDouble("blurScore", blurScore)
+                putDouble("glarePercent", glarePercent)
+                putString("side", side)
+                putDouble("sideFrontScore", sideFrontScore)
+                putDouble("sideBackScore", sideBackScore)
+                putMap("appliedCrop", appliedCrop.toWritableMap())
+            }
+        }
+    }
+
+    data class Failure(
+        val errorCode: String,
+        val errorMessage: String
+    ) : CardCapturedEvent {
+        override val success: Boolean = false
+
+        override fun toWritableMap(): WritableMap {
+            return Arguments.createMap().apply {
+                putBoolean("success", false)
+                putString("errorCode", errorCode)
+                putString("errorMessage", errorMessage)
+            }
+        }
+    }
+}

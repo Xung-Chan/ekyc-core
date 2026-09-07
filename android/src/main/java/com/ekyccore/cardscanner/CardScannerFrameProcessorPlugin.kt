@@ -20,6 +20,7 @@ class CardScannerFrameProcessorPlugin(
 
     private var lastProcessedTimestamp = 0L
     private var openCvReady = false
+    private var reusableNv21Bytes: ByteArray? = null
 
     init {
         initOpenCv()
@@ -116,16 +117,15 @@ class CardScannerFrameProcessorPlugin(
 
             croppedMat = Mat(uprightMat, org.opencv.core.Rect(cropX, cropY, cropW, cropH))
 
-            isDoc = manager.isDocumentPresent(croppedMat)
-            if (isDoc) {
-                manager.checkCardStability(croppedMat)
-            } else {
-                manager.clearCorners()
+            val docCheck = manager.checkDocumentPresenceAndStability(croppedMat)
+            isDoc = docCheck.isPresent
+            if (!isDoc) {
                 manager.clearCache()
             }
 
-            blurVal = manager.computeBlurScore(croppedMat)
-            glarePct = manager.computeGlarePercent(croppedMat)
+            val (bVal, gPct) = manager.computeBlurAndGlare(croppedMat)
+            blurVal = bVal
+            glarePct = gPct
 
             passedAllThresholds = isDoc && blurVal >= params.blurThreshold && glarePct <= params.glareThreshold
             val canStartOcr = (now - manager.lastOcrExecutionTime) >= 500L
@@ -223,7 +223,12 @@ class CardScannerFrameProcessorPlugin(
         val uSize = uBuffer.remaining()
         val vSize = vBuffer.remaining()
 
-        val nv21Bytes = ByteArray(width * height * 3 / 2)
+        val requiredSize = width * height * 3 / 2
+        var nv21Bytes = reusableNv21Bytes
+        if (nv21Bytes == null || nv21Bytes.size != requiredSize) {
+            nv21Bytes = ByteArray(requiredSize)
+            reusableNv21Bytes = nv21Bytes
+        }
 
         // Copy Y channel
         yBuffer.get(nv21Bytes, 0, ySize)

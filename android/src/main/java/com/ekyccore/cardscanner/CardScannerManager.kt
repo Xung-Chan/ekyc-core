@@ -266,19 +266,7 @@ class CardScannerManager private constructor(private val context: Context) {
     }
 
     fun checkCardStability(mat: Mat): Boolean {
-        val current = detectCardCorners(mat)
-        val last = lastCorners
-
-        var stable = false
-        if (current != null && last != null) {
-            val drift = calculateCornerDrift(current, last, mat.cols().toDouble())
-            stable = drift < 0.10
-        }
-
-        if (current != null) {
-            lastCorners = current
-        }
-        return stable
+        return checkDocumentPresenceAndStability(mat).isStable
     }
 
     companion object {
@@ -306,6 +294,12 @@ class CardScannerManager private constructor(private val context: Context) {
                 "img_src_",
             )
     }
+
+    data class DocumentPresenceAndStability(
+        val isPresent: Boolean,
+        val isStable: Boolean,
+        val corners: Array<org.opencv.core.Point>? = null
+    )
 
     data class CropJpegOnlyResult(
         val success: Boolean,
@@ -840,18 +834,22 @@ class CardScannerManager private constructor(private val context: Context) {
 
     // --- Quality Assessment Logic (merged from pipeline) ---
 
-    fun isDocumentPresent(mat: Mat): Boolean {
+    fun checkDocumentPresenceAndStability(mat: Mat): DocumentPresenceAndStability {
         val corners = detectCardCorners(mat)
         if (corners == null || corners.size != 4) {
-            Log.i(LOG_TAG, "isDocumentPresent: failed because detected corners is not 4 (count)")
-            return false
+            Log.i(LOG_TAG, "checkDocumentPresenceAndStability: failed because detected corners is not 4 (count)")
+            clearCorners()
+            return DocumentPresenceAndStability(isPresent = false, isStable = false, corners = null)
         }
 
         // Định cấu hình tỷ lệ biên an toàn (mặc định là 2% theo tài liệu corner_validation_steps.md)
         val marginFraction = 0.02
         val W = mat.cols().toDouble()
         val H = mat.rows().toDouble()
-        if (W <= 0.0 || H <= 0.0) return false
+        if (W <= 0.0 || H <= 0.0) {
+            clearCorners()
+            return DocumentPresenceAndStability(isPresent = false, isStable = false, corners = null)
+        }
 
         val mx = W * marginFraction
         val my = H * marginFraction
@@ -860,20 +858,33 @@ class CardScannerManager private constructor(private val context: Context) {
 
         for (pt in corners) {
             if (pt.x < mx || pt.x > maxX || pt.y < my || pt.y > maxY) {
-                Log.i(LOG_TAG, "isDocumentPresent: failed because corner is clipped by margin (QUAD_OUTSIDE_ROI): x=${pt.x}, y=${pt.y}, W=$W, H=$H, mx=$mx, my=$my")
-                return false
+                Log.i(
+                    LOG_TAG,
+                    "checkDocumentPresenceAndStability: failed because corner is clipped by margin (QUAD_OUTSIDE_ROI): x=${pt.x}, y=${pt.y}, W=$W, H=$H, mx=$mx, my=$my"
+                )
+                clearCorners()
+                return DocumentPresenceAndStability(isPresent = false, isStable = false, corners = null)
             }
         }
 
-        Log.i(LOG_TAG, "isDocumentPresent: PASSED! Corners detected and fully within crop region.")
-        return true
+        // Tính độ ổn định (stability) trực tiếp từ corners đã detect mà không cần chạy lại AI model lần 2
+        val last = lastCorners
+        var stable = false
+        if (last != null) {
+            val drift = calculateCornerDrift(corners, last, W)
+            stable = drift < 0.10
+        }
+        lastCorners = corners
+
+        Log.i(LOG_TAG, "checkDocumentPresenceAndStability: PASSED! isPresent=true, isStable=$stable")
+        return DocumentPresenceAndStability(isPresent = true, isStable = stable, corners = corners)
     }
 
-    //dùng cho autocapture
-    fun computeBlurScore(mat: Mat): Double {
-        val gray = Mat()
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+    fun isDocumentPresent(mat: Mat): Boolean {
+        return checkDocumentPresenceAndStability(mat).isPresent
+    }
 
+    fun computeBlurScoreFromGray(gray: Mat): Double {
         val laplacian = Mat()
         Imgproc.Laplacian(gray, laplacian, CvType.CV_64F)
 
@@ -884,30 +895,51 @@ class CardScannerManager private constructor(private val context: Context) {
         val stddevVal = stddev.toArray()[0]
         val variance = stddevVal * stddevVal
 
-        gray.release()
         laplacian.release()
         mean.release()
         stddev.release()
 
         return variance
     }
-    //dùng cho autocapture
-    fun computeGlarePercent(mat: Mat): Double {
-        val gray = Mat()
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
 
+    fun computeGlarePercentFromGray(gray: Mat): Double {
         val brightPixelsMat = Mat()
         // Ngưỡng 252.0 để chỉ lọc các pixel bị lóa/cháy sáng thực sự
         Imgproc.threshold(gray, brightPixelsMat, 252.0, 255.0, Imgproc.THRESH_BINARY)
 
         val glarePixelCount = Core.countNonZero(brightPixelsMat)
         val totalPixels = gray.cols() * gray.rows()
-        val glarePercent = glarePixelCount.toDouble() / totalPixels
+        val glarePercent = if (totalPixels > 0) glarePixelCount.toDouble() / totalPixels else 0.0
 
-        gray.release()
         brightPixelsMat.release()
-
         return glarePercent
+    }
+
+    fun computeBlurAndGlare(bgrMat: Mat): Pair<Double, Double> {
+        val gray = Mat()
+        Imgproc.cvtColor(bgrMat, gray, Imgproc.COLOR_BGR2GRAY)
+        val blur = computeBlurScoreFromGray(gray)
+        val glare = computeGlarePercentFromGray(gray)
+        gray.release()
+        return Pair(blur, glare)
+    }
+
+    //dùng cho autocapture
+    fun computeBlurScore(mat: Mat): Double {
+        val gray = Mat()
+        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+        val blur = computeBlurScoreFromGray(gray)
+        gray.release()
+        return blur
+    }
+
+    //dùng cho autocapture
+    fun computeGlarePercent(mat: Mat): Double {
+        val gray = Mat()
+        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+        val glare = computeGlarePercentFromGray(gray)
+        gray.release()
+        return glare
     }
 
     // --- Background Tasks ---

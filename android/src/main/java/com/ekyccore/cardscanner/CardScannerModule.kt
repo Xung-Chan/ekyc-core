@@ -32,6 +32,7 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
 
     companion object {
         const val NAME = "CardScanner"
+        const val EVENT_ON_CARD_CAPTURED = "onCardCaptured"
     }
 
     override fun cropCardImageOnly(params: ReadableMap, promise: Promise?) {
@@ -185,34 +186,36 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
         sideFrontScore: Double,
         sideBackScore: Double
     ) {
-        val event = Arguments.createMap().apply {
-            putBoolean("success", true)
-            putString("croppedImagePath", croppedImagePath)
-            putDouble("blurScore", blurScore)
-            putDouble("glarePercent", glarePercent)
-            putString("side", side)
-            putDouble("sideFrontScore", sideFrontScore)
-            putDouble("sideBackScore", sideBackScore)
-            putMap("appliedCrop", Arguments.createMap().apply {
-                putInt("x", appliedX)
-                putInt("y", appliedY)
-                putInt("width", appliedWidth)
-                putInt("height", appliedHeight)
-            })
-        }
-        sendEvent("onCardCaptured", event)
+        val event = CardCapturedEvent.Success(
+            croppedImagePath = croppedImagePath,
+            blurScore = blurScore,
+            glarePercent = glarePercent,
+            side = side,
+            sideFrontScore = sideFrontScore,
+            sideBackScore = sideBackScore,
+            appliedCrop = CropRect(
+                x = appliedX,
+                y = appliedY,
+                width = appliedWidth,
+                height = appliedHeight
+            )
+        )
+        sendEvent(EVENT_ON_CARD_CAPTURED, event)
     }
 
     override fun onCardCaptureFailed(errorCode: String, errorMessage: String) {
-        val event = Arguments.createMap().apply {
-            putBoolean("success", false)
-            putString("errorCode", errorCode)
-            putString("errorMessage", errorMessage)
-        }
-        sendEvent("onCardCaptured", event)
+        val event = CardCapturedEvent.Failure(
+            errorCode = errorCode,
+            errorMessage = errorMessage
+        )
+        sendEvent(EVENT_ON_CARD_CAPTURED, event)
     }
 
     // --- Helper Methods ---
+
+    private fun sendEvent(eventName: String, event: CardCapturedEvent) {
+        sendEvent(eventName, event.toWritableMap())
+    }
 
     private fun sendEvent(eventName: String, params: WritableMap?) {
         if (reactApplicationContext.hasActiveReactInstance()) {

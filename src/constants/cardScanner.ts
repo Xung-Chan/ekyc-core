@@ -13,7 +13,7 @@ export const MANUAL_CARD_SCAN_GUIDE_OUTSET = {
 // Độ lệch AR của ảnh gốc so với AR lý tưởng
 export const MANUAL_CROP_SOURCE_STILL_AR_REL_MAX = 0.05;
 
-export const CARD_SCANNER_DEFAULT_THROTTLE_MS = 120;
+export const CARD_SCANNER_DEFAULT_THROTTLE_MS = 250;
 export const CARD_SCANNER_DEFAULT_BLUR_THRESHOLD = 150.0;
 export const CARD_SCANNER_DEFAULT_GLARE_THRESHOLD = 0.08;
 

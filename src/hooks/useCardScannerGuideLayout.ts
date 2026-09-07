@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { type LayoutChangeEvent } from 'react-native';
+import { Dimensions, type LayoutChangeEvent } from 'react-native';
 import type { CardScannerCameraViewGuideConfig } from '../components/CardScannerCameraView';
 import {
   computeCardScannerGuideRectInPreview,
@@ -18,7 +18,6 @@ import {
   FIGMA_GUIDE_W,
   FIGMA_HOLE_RX,
 } from '../constants';
-import { Dimensions } from 'react-native/Libraries/Utilities/Dimensions';
 
 const SCREEN = Dimensions.get('window');
 
