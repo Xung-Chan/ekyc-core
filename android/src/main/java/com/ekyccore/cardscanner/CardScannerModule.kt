@@ -32,6 +32,7 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
 
     companion object {
         const val NAME = "CardScanner"
+        const val EVENT_ON_CARD_CAPTURED = "onCardCaptured"
     }
 
     override fun cropCardImageOnly(params: ReadableMap, promise: Promise?) {
@@ -41,22 +42,26 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
 
         if (imagePath.isBlank() || crop == null) {
             promise?.resolve(
-                buildCropOnlyError(
-                    imagePath,
-                    "INVALID_INPUT",
-                    "imagePath and crop are required",
-                ),
+                Arguments.createMap().apply {
+                    putBoolean("success", false)
+                    putString("originalImagePath", imagePath)
+                    putBoolean("debugSavedToGallery", false)
+                    putString("errorCode", "INVALID_INPUT")
+                    putString("errorMessage", "imagePath and crop are required")
+                }
             )
             return
         }
 
         if (crop.width <= 0 || crop.height <= 0) {
             promise?.resolve(
-                buildCropOnlyError(
-                    imagePath,
-                    "INVALID_INPUT",
-                    "crop.width and crop.height must be positive",
-                ),
+                Arguments.createMap().apply {
+                    putBoolean("success", false)
+                    putString("originalImagePath", imagePath)
+                    putBoolean("debugSavedToGallery", false)
+                    putString("errorCode", "INVALID_INPUT")
+                    putString("errorMessage", "imagePath and crop are required")
+                }
             )
             return
         }
@@ -78,7 +83,11 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
                     promise?.resolve(mapToWritableMap(result))
                 }
 
-                override fun onFailure(errorCode: String, errorMessage: String, debugDetails: Map<String, Any>?) {
+                override fun onFailure(
+                    errorCode: String,
+                    errorMessage: String,
+                    debugDetails: Map<String, Any>?
+                ) {
                     promise?.resolve(
                         Arguments.createMap().apply {
                             putBoolean("success", false)
@@ -114,7 +123,11 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
             }
 
             override fun onFailure(throwable: Throwable) {
-                promise?.reject("DELETE_LOCAL_IMAGES_FAILED", throwable.message ?: throwable.toString(), throwable)
+                promise?.reject(
+                    "DELETE_LOCAL_IMAGES_FAILED",
+                    throwable.message ?: throwable.toString(),
+                    throwable
+                )
             }
         })
     }
@@ -142,7 +155,11 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
             }
 
             override fun onFailure(throwable: Throwable) {
-                promise?.reject("SCRUB_TEMP_FILES_FAILED", throwable.message ?: throwable.toString(), throwable)
+                promise?.reject(
+                    "SCRUB_TEMP_FILES_FAILED",
+                    throwable.message ?: throwable.toString(),
+                    throwable
+                )
             }
         })
     }
@@ -169,34 +186,36 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
         sideFrontScore: Double,
         sideBackScore: Double
     ) {
-        val event = Arguments.createMap().apply {
-            putBoolean("success", true)
-            putString("croppedImagePath", croppedImagePath)
-            putDouble("blurScore", blurScore)
-            putDouble("glarePercent", glarePercent)
-            putString("side", side)
-            putDouble("sideFrontScore", sideFrontScore)
-            putDouble("sideBackScore", sideBackScore)
-            putMap("appliedCrop", Arguments.createMap().apply {
-                putInt("x", appliedX)
-                putInt("y", appliedY)
-                putInt("width", appliedWidth)
-                putInt("height", appliedHeight)
-            })
-        }
-        sendEvent("onCardCaptured", event)
+        val event = CardCapturedEvent.Success(
+            croppedImagePath = croppedImagePath,
+            blurScore = blurScore,
+            glarePercent = glarePercent,
+            side = side,
+            sideFrontScore = sideFrontScore,
+            sideBackScore = sideBackScore,
+            appliedCrop = CropRect(
+                x = appliedX,
+                y = appliedY,
+                width = appliedWidth,
+                height = appliedHeight
+            )
+        )
+        sendEvent(EVENT_ON_CARD_CAPTURED, event)
     }
 
     override fun onCardCaptureFailed(errorCode: String, errorMessage: String) {
-        val event = Arguments.createMap().apply {
-            putBoolean("success", false)
-            putString("errorCode", errorCode)
-            putString("errorMessage", errorMessage)
-        }
-        sendEvent("onCardCaptured", event)
+        val event = CardCapturedEvent.Failure(
+            errorCode = errorCode,
+            errorMessage = errorMessage
+        )
+        sendEvent(EVENT_ON_CARD_CAPTURED, event)
     }
 
     // --- Helper Methods ---
+
+    private fun sendEvent(eventName: String, event: CardCapturedEvent) {
+        sendEvent(eventName, event.toWritableMap())
+    }
 
     private fun sendEvent(eventName: String, params: WritableMap?) {
         if (reactApplicationContext.hasActiveReactInstance()) {
@@ -206,56 +225,9 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
-    private fun buildCropOnlyError(path: String, code: String, message: String) =
-        Arguments.createMap().apply {
-            putBoolean("success", false)
-            putString("originalImagePath", path)
-            putBoolean("debugSavedToGallery", false)
-            putString("errorCode", code)
-            putString("errorMessage", message)
-        }
 
-    private fun readCropCoord(m: ReadableMap, key: String): Int {
-        if (!m.hasKey(key)) return 0
-        return try {
-            when (m.getType(key)) {
-                ReadableType.Number -> m.getDouble(key).toInt()
-                else -> m.getInt(key)
-            }
-        } catch (_: Throwable) {
-            0
-        }
-    }
 
-    private fun readOptionalBool(params: ReadableMap, key: String): Boolean {
-        if (!params.hasKey(key)) return false
-        return try {
-            when (params.getType(key)) {
-                ReadableType.Boolean -> params.getBoolean(key)
-                else -> false
-            }
-        } catch (_: Throwable) {
-            false
-        }
-    }
-
-    private fun readBufferDimension(params: ReadableMap, key: String): Int {
-        if (!params.hasKey(key)) return 0
-        return try {
-            when (params.getType(key)) {
-                ReadableType.Number -> {
-                    val v = params.getDouble(key)
-                    if (!v.isFinite() || v < 1) 0 else v.toInt().coerceIn(1, 8192)
-                }
-
-                else -> params.getInt(key).coerceAtLeast(0)
-            }
-        } catch (_: Throwable) {
-            0
-        }
-    }
-
-    @Suppress("UNCHECKED_CAST")
+    //    @Suppress("UNCHECKED_CAST")
     private fun mapToWritableMap(map: Map<String, Any?>): WritableMap {
         val writable = Arguments.createMap()
         for ((key, value) in map) {

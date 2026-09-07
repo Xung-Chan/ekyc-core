@@ -1,17 +1,26 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  CARD_SCANNER_DEFAULT_THROTTLE_MS,
+  CARD_SCANNER_DEFAULT_BLUR_THRESHOLD,
+  CARD_SCANNER_DEFAULT_GLARE_THRESHOLD,
+  EVENTS_NAME,
+} from '../constants';
 import { NativeEventEmitter, NativeModules } from 'react-native';
-import { Camera, useFrameProcessor } from 'react-native-vision-camera';
+import {
+  Camera,
+  useFrameProcessor,
+  type Orientation,
+} from 'react-native-vision-camera';
 import { useRunOnJS } from 'react-native-worklets-core';
 
 import { cropCardImageOnly } from '../modules/cardScanner';
 import {
   computePhotoRawCropRectForCardScan,
   type ManualPhotoCropPlan,
-  type Orientation,
   type Rect,
 } from '../modules/photoGuideCropRect';
 import { scanCardFrame, type ScanFrameResult } from '../modules/scanCardFrame';
-import type { ScanCardResult } from '../types';
+import type { ScanCardResult, CardCapturedEvent } from '../types';
 import { manualCropOnlyToScanResult } from '../utils/cardScannerHelpers';
 
 const cardScannerEmitter = new NativeEventEmitter(NativeModules.CardScanner);
@@ -38,12 +47,25 @@ export function useCardScannerCapture({
   const [busy, setBusy] = useState(false);
   const captureLockRef = useRef(false);
   const [isDocDetected, setIsDocDetected] = useState(false);
+  const lastValidationStateRef = useRef<{ isDoc: boolean; errCode: string }>({
+    isDoc: false,
+    errCode: '',
+  });
 
   const onFrameValidatedJS = useRunOnJS(
     (isDocumentPresent: boolean, errorCode: string, errorMessage: string) => {
-      setIsDocDetected(isDocumentPresent);
-      if (onFrameValidated) {
-        onFrameValidated({ isDocumentPresent, errorCode, errorMessage });
+      if (
+        lastValidationStateRef.current.isDoc !== isDocumentPresent ||
+        lastValidationStateRef.current.errCode !== errorCode
+      ) {
+        lastValidationStateRef.current = {
+          isDoc: isDocumentPresent,
+          errCode: errorCode,
+        };
+        setIsDocDetected(isDocumentPresent);
+        if (onFrameValidated) {
+          onFrameValidated({ isDocumentPresent, errorCode, errorMessage });
+        }
       }
     },
     [onFrameValidated]
@@ -56,11 +78,11 @@ export function useCardScannerCapture({
     }
 
     const subscriptionCapture = cardScannerEmitter.addListener(
-      'onCardCaptured',
-      async (event) => {
+      EVENTS_NAME.CARD_CAPTURED,
+      async (event: CardCapturedEvent) => {
         if (busy || captureLockRef.current) return;
 
-        if (event.success && event.croppedImagePath) {
+        if (event.success) {
           captureLockRef.current = true;
           setBusy(true);
           const scanResult: ScanCardResult = {
@@ -68,30 +90,28 @@ export function useCardScannerCapture({
             originalImagePath: event.croppedImagePath,
             croppedImagePath: event.croppedImagePath,
             side: event.side || expectedSide || 'unknown',
-            sideFrontScore: event.sideFrontScore ?? 0,
-            sideBackScore: event.sideBackScore ?? 0,
+            sideFrontScore: event.sideFrontScore,
+            sideBackScore: event.sideBackScore,
             quality: {
               passed: true,
-              blurScore: event.blurScore ?? 0.0,
+              blurScore: event.blurScore,
               motionScore: 0.0,
-              glareScore: (event.glarePercent ?? 0.0) * 100,
+              glareScore: event.glarePercent * 100,
               exposure: 'ok',
               reasons: [],
             },
-            appliedCrop: event.appliedCrop
-              ? {
-                  x: event.appliedCrop.x,
-                  y: event.appliedCrop.y,
-                  width: event.appliedCrop.width,
-                  height: event.appliedCrop.height,
-                }
-              : undefined,
+            appliedCrop: {
+              x: event.appliedCrop.x,
+              y: event.appliedCrop.y,
+              width: event.appliedCrop.width,
+              height: event.appliedCrop.height,
+            },
             manualCaptureDebugSavedToGallery: false,
           };
           onPhotoCaptured?.(event.croppedImagePath, scanResult);
           captureLockRef.current = false;
           setBusy(false);
-        } else if (!event.success) {
+        } else {
           captureLockRef.current = true;
           setBusy(true);
           const scanResult: ScanCardResult = {
@@ -102,9 +122,9 @@ export function useCardScannerCapture({
             sideBackScore: 0,
             quality: {
               passed: false,
-              blurScore: event.blurScore ?? 0.0,
+              blurScore: 0.0,
               motionScore: 0.0,
-              glareScore: (event.glarePercent ?? 0.0) * 100,
+              glareScore: 0.0,
               exposure: 'ok',
               reasons: [event.errorCode ?? 'QUALITY_FAILED'],
             },
@@ -128,7 +148,6 @@ export function useCardScannerCapture({
     (frame) => {
       'worklet';
       if (busy || captureLockRef.current) {
-        onFrameValidatedJS(false, '', '');
         return;
       }
 
@@ -140,9 +159,9 @@ export function useCardScannerCapture({
         guideWidth: overlayGuide.width,
         guideHeight: overlayGuide.height,
         bufferOrientation: frame.orientation,
-        throttleMs: 150,
-        blurThreshold: 150.0,
-        glareThreshold: 0.05,
+        throttleMs: CARD_SCANNER_DEFAULT_THROTTLE_MS,
+        blurThreshold: CARD_SCANNER_DEFAULT_BLUR_THRESHOLD,
+        glareThreshold: CARD_SCANNER_DEFAULT_GLARE_THRESHOLD,
         expectedSide: expectedSide,
       });
 
@@ -152,11 +171,9 @@ export function useCardScannerCapture({
           result.errorCode,
           result.errorMessage
         );
-      } else {
-        onFrameValidatedJS(false, '', '');
       }
     },
-    [previewSize, overlayGuide, busy, onFrameValidatedJS]
+    [previewSize, overlayGuide, busy, onFrameValidatedJS, expectedSide]
   );
 
   const takePhoto = useCallback(async (): Promise<string | null> => {
@@ -218,12 +235,14 @@ export function useCardScannerCapture({
 
   const start = useCallback(() => {
     captureLockRef.current = false;
+    lastValidationStateRef.current = { isDoc: false, errCode: '' };
     setBusy(false);
     setIsDocDetected(false);
   }, []);
 
   const reset = useCallback(() => {
     captureLockRef.current = false;
+    lastValidationStateRef.current = { isDoc: false, errCode: '' };
     setBusy(false);
     setIsDocDetected(false);
   }, []);

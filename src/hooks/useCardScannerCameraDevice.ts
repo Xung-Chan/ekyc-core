@@ -1,6 +1,13 @@
-import { useState, useEffect } from 'react';
-import { Dimensions } from 'react-native';
+import { useEffect, useState } from 'react';
 import { useCameraDevice, useCameraFormat } from 'react-native-vision-camera';
+
+import { Dimensions } from 'react-native';
+
+import {
+  CAMERA_VIDEO_RESOLUTION_FHD,
+  CAMERA_DEVICE_RETRY_TIMEOUT_MS,
+  CAMERA_DEVICE_INIT_TIMEOUT_MS,
+} from '../constants';
 
 const SCREEN = Dimensions.get('window');
 
@@ -11,7 +18,7 @@ export function useCardScannerCameraDevice(
   const device = useCameraDevice('back');
   const format = useCameraFormat(device, [
     { fps: targetFps },
-    { videoResolution: { width: 1920, height: 1080 } },
+    { videoResolution: CAMERA_VIDEO_RESOLUTION_FHD },
     { videoAspectRatio: SCREEN.height / SCREEN.width },
     { photoAspectRatio: SCREEN.height / SCREEN.width },
   ]);
@@ -25,11 +32,11 @@ export function useCardScannerCameraDevice(
 
     const retryTimer = setTimeout(() => {
       onAutoRetry();
-    }, 500);
+    }, CAMERA_DEVICE_RETRY_TIMEOUT_MS);
 
     const timeoutTimer = setTimeout(() => {
       setIsTimeout(true);
-    }, 3000);
+    }, CAMERA_DEVICE_INIT_TIMEOUT_MS);
 
     return () => {
       clearTimeout(retryTimer);

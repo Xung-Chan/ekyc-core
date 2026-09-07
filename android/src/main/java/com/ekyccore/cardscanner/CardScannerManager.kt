@@ -37,6 +37,10 @@ class CardScannerManager private constructor(private val context: Context) {
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     }
 
+    private val tfLiteCardDetector by lazy {
+        TfLiteCardDetector(context)
+    }
+
     @Volatile
     var currentFrameIndex = 0L
         private set
@@ -122,6 +126,18 @@ class CardScannerManager private constructor(private val context: Context) {
     }
 
     fun detectCardCorners(mat: Mat): Array<org.opencv.core.Point>? {
+        // Thử chạy mô hình học máy TfLite trước để định vị góc thẻ
+        try {
+            val tfLiteRes = tfLiteCardDetector.detectFromBgr(mat, 1.0)
+            if (tfLiteRes.points != null && tfLiteRes.points.size == 4) {
+                Log.i(LOG_TAG, "detectCardCorners: TFLite model successfully detected 4 corners!")
+                return tfLiteRes.points.toTypedArray()
+            }
+        } catch (e: Throwable) {
+            Log.w(LOG_TAG, "detectCardCorners: TFLite execution failed, falling back to OpenCV. Error: ${e.message}")
+        }
+
+        // --- Fallback: Thuật toán OpenCV (Canny + Contour) ---
         // 1. Thêm viền đen (padding) 10 pixel xung quanh để xử lý trường hợp thẻ chạm sát mép ảnh crop
         val pad = 10
         val padded = Mat()
@@ -193,7 +209,7 @@ class CardScannerManager private constructor(private val context: Context) {
                 if (isCardAspectRatio && isRectangularEnough) {
                     val pts = Array(4) { org.opencv.core.Point() }
                     minRect.points(pts)
-                    
+
                     // Trừ đi padding để chuyển tọa độ về đúng hệ tọa độ của ảnh mat gốc ban đầu
                     for (pt in pts) {
                         pt.x -= pad
@@ -250,19 +266,7 @@ class CardScannerManager private constructor(private val context: Context) {
     }
 
     fun checkCardStability(mat: Mat): Boolean {
-        val current = detectCardCorners(mat)
-        val last = lastCorners
-
-        var stable = false
-        if (current != null && last != null) {
-            val drift = calculateCornerDrift(current, last, mat.cols().toDouble())
-            stable = drift < 0.10
-        }
-
-        if (current != null) {
-            lastCorners = current
-        }
-        return stable
+        return checkDocumentPresenceAndStability(mat).isStable
     }
 
     companion object {
@@ -290,6 +294,12 @@ class CardScannerManager private constructor(private val context: Context) {
                 "img_src_",
             )
     }
+
+    data class DocumentPresenceAndStability(
+        val isPresent: Boolean,
+        val isStable: Boolean,
+        val corners: Array<org.opencv.core.Point>? = null
+    )
 
     data class CropJpegOnlyResult(
         val success: Boolean,
@@ -824,35 +834,57 @@ class CardScannerManager private constructor(private val context: Context) {
 
     // --- Quality Assessment Logic (merged from pipeline) ---
 
-    fun isDocumentPresent(mat: Mat): Boolean {
+    fun checkDocumentPresenceAndStability(mat: Mat): DocumentPresenceAndStability {
         val corners = detectCardCorners(mat)
         if (corners == null || corners.size != 4) {
-            Log.i(LOG_TAG, "isDocumentPresent: failed because detected corners is not 4 (count)")
-            return false
+            Log.i(LOG_TAG, "checkDocumentPresenceAndStability: failed because detected corners is not 4 (count)")
+            clearCorners()
+            return DocumentPresenceAndStability(isPresent = false, isStable = false, corners = null)
         }
 
-        // Nới lỏng biên kiểm định sang biên âm (ngoài vùng crop) tối đa 5 pixel
-        // giúp tránh lỗi khi MinAreaRect hơi mở rộng ra ngoài một chút do bo tròn góc hoặc nhiễu viền
-        val marginX = -5.0
-        val marginY = -5.0
+        // Định cấu hình tỷ lệ biên an toàn (mặc định là 2% theo tài liệu corner_validation_steps.md)
+        val marginFraction = 0.02
         val W = mat.cols().toDouble()
         val H = mat.rows().toDouble()
+        if (W <= 0.0 || H <= 0.0) {
+            clearCorners()
+            return DocumentPresenceAndStability(isPresent = false, isStable = false, corners = null)
+        }
+
+        val mx = W * marginFraction
+        val my = H * marginFraction
+        val maxX = W - mx
+        val maxY = H - my
+
         for (pt in corners) {
-            if (pt.x <= marginX || pt.x >= (W - marginX) || pt.y <= marginY || pt.y >= (H - marginY)) {
-                Log.i(LOG_TAG, "isDocumentPresent: failed because corner is clipped by margin: x=${pt.x}, y=${pt.y}, W=$W, H=$H")
-                return false
+            if (pt.x < mx || pt.x > maxX || pt.y < my || pt.y > maxY) {
+                Log.i(
+                    LOG_TAG,
+                    "checkDocumentPresenceAndStability: failed because corner is clipped by margin (QUAD_OUTSIDE_ROI): x=${pt.x}, y=${pt.y}, W=$W, H=$H, mx=$mx, my=$my"
+                )
+                clearCorners()
+                return DocumentPresenceAndStability(isPresent = false, isStable = false, corners = null)
             }
         }
 
-        Log.i(LOG_TAG, "isDocumentPresent: PASSED! Corners detected and fully within crop region.")
-        return true
+        // Tính độ ổn định (stability) trực tiếp từ corners đã detect mà không cần chạy lại AI model lần 2
+        val last = lastCorners
+        var stable = false
+        if (last != null) {
+            val drift = calculateCornerDrift(corners, last, W)
+            stable = drift < 0.10
+        }
+        lastCorners = corners
+
+        Log.i(LOG_TAG, "checkDocumentPresenceAndStability: PASSED! isPresent=true, isStable=$stable")
+        return DocumentPresenceAndStability(isPresent = true, isStable = stable, corners = corners)
     }
 
-    //dùng cho autocapture
-    fun computeBlurScore(mat: Mat): Double {
-        val gray = Mat()
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+    fun isDocumentPresent(mat: Mat): Boolean {
+        return checkDocumentPresenceAndStability(mat).isPresent
+    }
 
+    fun computeBlurScoreFromGray(gray: Mat): Double {
         val laplacian = Mat()
         Imgproc.Laplacian(gray, laplacian, CvType.CV_64F)
 
@@ -863,29 +895,51 @@ class CardScannerManager private constructor(private val context: Context) {
         val stddevVal = stddev.toArray()[0]
         val variance = stddevVal * stddevVal
 
-        gray.release()
         laplacian.release()
         mean.release()
         stddev.release()
 
         return variance
     }
+
+    fun computeGlarePercentFromGray(gray: Mat): Double {
+        val brightPixelsMat = Mat()
+        // Ngưỡng 252.0 để chỉ lọc các pixel bị lóa/cháy sáng thực sự
+        Imgproc.threshold(gray, brightPixelsMat, 252.0, 255.0, Imgproc.THRESH_BINARY)
+
+        val glarePixelCount = Core.countNonZero(brightPixelsMat)
+        val totalPixels = gray.cols() * gray.rows()
+        val glarePercent = if (totalPixels > 0) glarePixelCount.toDouble() / totalPixels else 0.0
+
+        brightPixelsMat.release()
+        return glarePercent
+    }
+
+    fun computeBlurAndGlare(bgrMat: Mat): Pair<Double, Double> {
+        val gray = Mat()
+        Imgproc.cvtColor(bgrMat, gray, Imgproc.COLOR_BGR2GRAY)
+        val blur = computeBlurScoreFromGray(gray)
+        val glare = computeGlarePercentFromGray(gray)
+        gray.release()
+        return Pair(blur, glare)
+    }
+
+    //dùng cho autocapture
+    fun computeBlurScore(mat: Mat): Double {
+        val gray = Mat()
+        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+        val blur = computeBlurScoreFromGray(gray)
+        gray.release()
+        return blur
+    }
+
     //dùng cho autocapture
     fun computeGlarePercent(mat: Mat): Double {
         val gray = Mat()
         Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
-
-        val brightPixelsMat = Mat()
-        Imgproc.threshold(gray, brightPixelsMat, 250.0, 255.0, Imgproc.THRESH_BINARY)
-
-        val glarePixelCount = Core.countNonZero(brightPixelsMat)
-        val totalPixels = gray.cols() * gray.rows()
-        val glarePercent = glarePixelCount.toDouble() / totalPixels
-
+        val glare = computeGlarePercentFromGray(gray)
         gray.release()
-        brightPixelsMat.release()
-
-        return glarePercent
+        return glare
     }
 
     // --- Background Tasks ---
@@ -1099,14 +1153,7 @@ class CardScannerManager private constructor(private val context: Context) {
         }
     }
 
-    data class OcrResult(
-        val success: Boolean,
-        val side: String,
-        val frontScore: Double,
-        val backScore: Double,
-        val errorCode: String?,
-        val errorMessage: String?
-    )
+
 
     fun runOcrAndSideClassification(mat: Mat, expectedSide: String?): OcrResult {
         val bmp = try {
@@ -1277,8 +1324,9 @@ class CardScannerManager private constructor(private val context: Context) {
 
         val maskS = Mat()
         val maskV = Mat()
-        Imgproc.threshold(s, maskS, 42.0, 255.0, Imgproc.THRESH_BINARY_INV)
-        Imgproc.threshold(v, maskV, 247.0, 255.0, Imgproc.THRESH_BINARY)
+        // Nới lỏng: chỉ nhận diện lóa khi màu thực sự mất sắc (s <= 35.0) và độ sáng rất cao (v >= 250.0)
+        Imgproc.threshold(s, maskS, 35.0, 255.0, Imgproc.THRESH_BINARY_INV)
+        Imgproc.threshold(v, maskV, 250.0, 255.0, Imgproc.THRESH_BINARY)
 
         val glareMask = Mat()
         Core.bitwise_and(maskS, maskV, glareMask)
@@ -1309,7 +1357,9 @@ class CardScannerManager private constructor(private val context: Context) {
         }
 
         val glarePercent = maxGlareArea.toDouble() / totalPixels
-        if (glarePercent >= 0.035) {
+        Log.i(LOG_TAG, "validateQuality: glare check maxGlareArea=$maxGlareArea, totalPixels=$totalPixels, glarePercent=$glarePercent (threshold=0.08)")
+        // Nới lỏng ngưỡng diện tích vệt lóa liên thông từ 0.035 (3.5%) lên 0.08 (8%)
+        if (glarePercent >= 0.08) {
             return "IMAGE_HAS_GLARE"
         }
 
