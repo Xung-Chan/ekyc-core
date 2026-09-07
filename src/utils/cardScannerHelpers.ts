@@ -1,4 +1,4 @@
-import type { CropCardImageOnlyResult, ScanCardResult } from '../type';
+import type { CropCardImageOnlyResult, ScanCardResult } from '../types';
 
 export function lBracketPathRoundTopLeft(
   hx: number,

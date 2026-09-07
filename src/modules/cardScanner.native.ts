@@ -1,4 +1,7 @@
-import type { CropCardImageOnlyParams, CropCardImageOnlyResult } from '../type';
+import type {
+  CropCardImageOnlyParams,
+  CropCardImageOnlyResult,
+} from '../types';
 import CardScanner from '../specs/NativeCardScanner';
 
 export async function cropCardImageOnly(

@@ -209,7 +209,7 @@ class CardScannerManager private constructor(private val context: Context) {
                 if (isCardAspectRatio && isRectangularEnough) {
                     val pts = Array(4) { org.opencv.core.Point() }
                     minRect.points(pts)
-                    
+
                     // Trừ đi padding để chuyển tọa độ về đúng hệ tọa độ của ảnh mat gốc ban đầu
                     for (pt in pts) {
                         pt.x -= pad
@@ -897,7 +897,8 @@ class CardScannerManager private constructor(private val context: Context) {
         Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
 
         val brightPixelsMat = Mat()
-        Imgproc.threshold(gray, brightPixelsMat, 250.0, 255.0, Imgproc.THRESH_BINARY)
+        // Ngưỡng 252.0 để chỉ lọc các pixel bị lóa/cháy sáng thực sự
+        Imgproc.threshold(gray, brightPixelsMat, 252.0, 255.0, Imgproc.THRESH_BINARY)
 
         val glarePixelCount = Core.countNonZero(brightPixelsMat)
         val totalPixels = gray.cols() * gray.rows()
@@ -1120,14 +1121,7 @@ class CardScannerManager private constructor(private val context: Context) {
         }
     }
 
-    data class OcrResult(
-        val success: Boolean,
-        val side: String,
-        val frontScore: Double,
-        val backScore: Double,
-        val errorCode: String?,
-        val errorMessage: String?
-    )
+
 
     fun runOcrAndSideClassification(mat: Mat, expectedSide: String?): OcrResult {
         val bmp = try {
@@ -1298,8 +1292,9 @@ class CardScannerManager private constructor(private val context: Context) {
 
         val maskS = Mat()
         val maskV = Mat()
-        Imgproc.threshold(s, maskS, 42.0, 255.0, Imgproc.THRESH_BINARY_INV)
-        Imgproc.threshold(v, maskV, 247.0, 255.0, Imgproc.THRESH_BINARY)
+        // Nới lỏng: chỉ nhận diện lóa khi màu thực sự mất sắc (s <= 35.0) và độ sáng rất cao (v >= 250.0)
+        Imgproc.threshold(s, maskS, 35.0, 255.0, Imgproc.THRESH_BINARY_INV)
+        Imgproc.threshold(v, maskV, 250.0, 255.0, Imgproc.THRESH_BINARY)
 
         val glareMask = Mat()
         Core.bitwise_and(maskS, maskV, glareMask)
@@ -1330,7 +1325,9 @@ class CardScannerManager private constructor(private val context: Context) {
         }
 
         val glarePercent = maxGlareArea.toDouble() / totalPixels
-        if (glarePercent >= 0.035) {
+        Log.i(LOG_TAG, "validateQuality: glare check maxGlareArea=$maxGlareArea, totalPixels=$totalPixels, glarePercent=$glarePercent (threshold=0.08)")
+        // Nới lỏng ngưỡng diện tích vệt lóa liên thông từ 0.035 (3.5%) lên 0.08 (8%)
+        if (glarePercent >= 0.08) {
             return "IMAGE_HAS_GLARE"
         }
 

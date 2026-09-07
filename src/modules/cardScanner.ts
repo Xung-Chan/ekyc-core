@@ -1,4 +1,7 @@
-import type { CropCardImageOnlyParams, CropCardImageOnlyResult } from '../type';
+import type {
+  CropCardImageOnlyParams,
+  CropCardImageOnlyResult,
+} from '../types';
 
 export function cropCardImageOnly(
   _params: CropCardImageOnlyParams

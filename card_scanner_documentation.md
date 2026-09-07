@@ -40,7 +40,7 @@ graph TD
 | **Độ phơi sáng tối** | Độ sáng trung bình (pixel mean) | `meanDark = 58.0` | `IMAGE_TOO_DARK` |
 | **Độ phơi sáng sáng** | Độ sáng trung bình (pixel mean) | `meanBright = 198.0` | `IMAGE_TOO_BRIGHT` |
 | **Độ tương phản** | Độ lệch chuẩn (StdDev) pixel ảnh xám | `contrastStdMin = 12.0` | `IMAGE_LOW_CONTRAST` |
-| **Lóa sáng (Glare)** | Lọc vùng màu sắc HSV (V $\ge$ 248, S $\le$ 42) & Phân tích thành phần liên thông (Connected Component) | Glare score > 8.0 (hoặc 11.0 nếu sáng/rõ) và đốm lóa liên thông chiếm $\ge$ 3.5% diện tích vùng ROI | `IMAGE_HAS_GLARE` |
+| **Lóa sáng (Glare)** | Lọc vùng màu sắc HSV (V $\ge$ 250, S $\le$ 35) & Phân tích thành phần liên thông (Connected Component) | Đốm lóa liên thông chiếm $\ge$ 8.0% diện tích vùng ROI | `IMAGE_HAS_GLARE` |
 
 ### Giai đoạn 4: Nhận diện văn bản (OCR)
 * Chuyển đổi ảnh thẻ OpenCV Mat thành Bitmap và chạy công cụ nhận diện ký tự **Google ML Kit Text Recognition**.

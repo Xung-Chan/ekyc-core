@@ -1,0 +1,16 @@
+export const FACE_PORTRAIT_CONFIG_BASE = {
+  guideWidthFraction: 0.72,
+  guideAspectRatio: 0.7,
+  guideCenterYFraction: 0.42,
+  faceCropHeightExpansion: 0.45,
+  faceTargetFillMin: 0.5,
+  faceTargetFillMax: 0.9,
+  guideFaceContainmentPaddingFraction: 0.08,
+  frameThrottleMs: 90,
+  autoCaptureStableFrameCount: 4,
+  glareMeanLumaThreshold: 232,
+  verifyFaceOnStill: false,
+  requireEyesOpen: true,
+  eyeOpenProbabilityMin: 0.12,
+  eyeOpenLandmarkRatioMin: 0.1,
+} as const;
