@@ -68,3 +68,20 @@ export type ScanCardResult = {
   errorCode?: string;
   errorMessage?: string;
 };
+
+export type CardCapturedEvent =
+  | {
+      success: true;
+      croppedImagePath: string;
+      blurScore: number;
+      glarePercent: number;
+      side: string;
+      sideFrontScore: number;
+      sideBackScore: number;
+      appliedCrop: CropRect;
+    }
+  | {
+      success: false;
+      errorCode: string;
+      errorMessage: string;
+    };

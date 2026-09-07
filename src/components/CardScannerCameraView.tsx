@@ -17,10 +17,7 @@ import { useInitCardScannerCameraView } from '../hooks/useInitCardScannerCameraV
 import { type ScanFrameResult } from '../modules/scanCardFrame';
 import type { ScanCardResult } from '../types';
 
-const DEFAULT_GUIDE = {
-  widthFraction: 0.86,
-  aspectRatio: 1.586,
-};
+import { DEFAULT_GUIDE } from '../constants';
 
 // Helper functions moved to cardScannerHelpers.ts
 

@@ -1,5 +1,10 @@
-export type Orientation =
-  'portrait' | 'portrait-upside-down' | 'landscape-left' | 'landscape-right';
+import type { Orientation } from 'react-native-vision-camera';
+import {
+  MANUAL_CARD_SCAN_GUIDE_OUTSET,
+  DEFAULT_GUIDE,
+  ORIENTATION_PROBE_ORDER,
+  MANUAL_CROP_SOURCE_STILL_AR_REL_MAX,
+} from '../constants';
 
 export type Rect = { x: number; y: number; width: number; height: number };
 export type Size = { width: number; height: number };
@@ -27,22 +32,6 @@ export type PhotoGuideCropInput = {
   syncFrame?: { width: number; height: number; orientation: Orientation };
   debugLog?: boolean;
 };
-
-export const MANUAL_CARD_SCAN_GUIDE_OUTSET = {
-  min: 0.1,
-  max: 0.15,
-  default: 0.125,
-} as const;
-
-const DEFAULT_GUIDE_WIDTH_FRACTION = 0.86;
-const DEFAULT_GUIDE_ASPECT = 1.586;
-const CARD_ASPECT_UPRIGHT_MANUAL_CROP = DEFAULT_GUIDE_ASPECT;
-const ORIENTATION_PROBE_ORDER: Orientation[] = [
-  'portrait',
-  'landscape-right',
-  'portrait-upside-down',
-  'landscape-left',
-];
 
 export function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
@@ -156,8 +145,8 @@ export function computeCardScannerGuideRectInPreview(params: {
   widthFraction?: number;
   aspectRatio?: number;
 }): Rect {
-  const wFrac = params.widthFraction ?? DEFAULT_GUIDE_WIDTH_FRACTION;
-  const aspect = params.aspectRatio ?? DEFAULT_GUIDE_ASPECT;
+  const wFrac = params.widthFraction ?? DEFAULT_GUIDE.widthFraction;
+  const aspect = params.aspectRatio ?? DEFAULT_GUIDE.aspectRatio;
   const pw = params.previewWidth;
   const ph = params.previewHeight;
   if (pw < 2 || ph < 2) {
@@ -172,8 +161,6 @@ export function computeCardScannerGuideRectInPreview(params: {
     height: gh,
   };
 }
-
-export const MANUAL_CROP_SOURCE_STILL_AR_REL_MAX = 0.05;
 
 function uprightAspectRelDelta(a: Size, b: Size): number {
   const arA = a.width / a.height;
@@ -517,7 +504,7 @@ export function computePhotoRawCropRectForCardScan(
   const cropW = roiUpright.width;
   const cropHFromAspect = Math.max(
     1,
-    Math.round(cropW / CARD_ASPECT_UPRIGHT_MANUAL_CROP)
+    Math.round(cropW / DEFAULT_GUIDE.aspectRatio)
   );
   const centerY = roiUpright.y + roiUpright.height / 2;
   let cropY = Math.round(centerY - cropHFromAspect / 2);

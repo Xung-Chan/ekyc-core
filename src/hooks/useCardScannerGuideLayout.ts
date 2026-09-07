@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
-import { Dimensions, type LayoutChangeEvent } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { type LayoutChangeEvent } from 'react-native';
+import type { CardScannerCameraViewGuideConfig } from '../components/CardScannerCameraView';
 import {
   computeCardScannerGuideRectInPreview,
   type Rect,
@@ -10,18 +11,16 @@ import {
   lBracketPathRoundTopLeft,
   lBracketPathRoundTopRight,
 } from '../utils/cardScannerHelpers';
-import type { CardScannerCameraViewGuideConfig } from '../components/CardScannerCameraView';
+
+import {
+  BRACKET_L_CORNER_RADIUS_PX,
+  DEFAULT_GUIDE,
+  FIGMA_GUIDE_W,
+  FIGMA_HOLE_RX,
+} from '../constants';
+import { Dimensions } from 'react-native/Libraries/Utilities/Dimensions';
 
 const SCREEN = Dimensions.get('window');
-
-const DEFAULT_GUIDE = {
-  widthFraction: 0.86,
-  aspectRatio: 1.586,
-};
-
-const FIGMA_GUIDE_W = 375;
-const FIGMA_HOLE_RX = 10;
-const BRACKET_L_CORNER_RADIUS_PX = 10;
 
 export function useCardScannerGuideLayout(
   guideCfg: CardScannerCameraViewGuideConfig
