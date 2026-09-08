@@ -8,6 +8,7 @@ import {
 import { NativeEventEmitter, NativeModules } from 'react-native';
 import {
   Camera,
+  runAsync,
   useFrameProcessor,
   type Orientation,
 } from 'react-native-vision-camera';
@@ -150,28 +151,30 @@ export function useCardScannerCapture({
       if (busy || captureLockRef.current) {
         return;
       }
+      runAsync(frame, () => {
+        'worklet';
+        const result = scanCardFrame(frame, {
+          previewWidth: previewSize.width,
+          previewHeight: previewSize.height,
+          guideX: overlayGuide.x,
+          guideY: overlayGuide.y,
+          guideWidth: overlayGuide.width,
+          guideHeight: overlayGuide.height,
+          bufferOrientation: frame.orientation,
+          throttleMs: CARD_SCANNER_DEFAULT_THROTTLE_MS,
+          blurThreshold: CARD_SCANNER_DEFAULT_BLUR_THRESHOLD,
+          glareThreshold: CARD_SCANNER_DEFAULT_GLARE_THRESHOLD,
+          expectedSide: expectedSide,
+        });
 
-      const result = scanCardFrame(frame, {
-        previewWidth: previewSize.width,
-        previewHeight: previewSize.height,
-        guideX: overlayGuide.x,
-        guideY: overlayGuide.y,
-        guideWidth: overlayGuide.width,
-        guideHeight: overlayGuide.height,
-        bufferOrientation: frame.orientation,
-        throttleMs: CARD_SCANNER_DEFAULT_THROTTLE_MS,
-        blurThreshold: CARD_SCANNER_DEFAULT_BLUR_THRESHOLD,
-        glareThreshold: CARD_SCANNER_DEFAULT_GLARE_THRESHOLD,
-        expectedSide: expectedSide,
+        if (result) {
+          onFrameValidatedJS(
+            result.isDocumentPresent,
+            result.errorCode,
+            result.errorMessage
+          );
+        }
       });
-
-      if (result) {
-        onFrameValidatedJS(
-          result.isDocumentPresent,
-          result.errorCode,
-          result.errorMessage
-        );
-      }
     },
     [previewSize, overlayGuide, busy, onFrameValidatedJS, expectedSide]
   );
