@@ -111,7 +111,8 @@
       [
         "module",
         {
-          "esm": true
+          "esm": true,
+          "configFile": true
         }
       ],
       [
