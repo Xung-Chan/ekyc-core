@@ -26,12 +26,58 @@ import kotlin.math.max
 
 class CardScannerManager private constructor(private val context: Context) {
 
+
+    companion object {
+        private const val LOG_TAG = "EkycCardScanner"
+
+        @Volatile
+        private var instance: CardScannerManager? = null
+
+        @Volatile
+        var openCvReady = false
+            private set
+
+        fun initOpenCv(): Boolean {
+            if (openCvReady) return true
+            val ok =
+                try {
+                    OpenCVLoader.initLocal()
+                } catch (_: Throwable) {
+                    try {
+                        OpenCVLoader.initDebug()
+                    } catch (_: Throwable) {
+                        false
+                    }
+                }
+            if (ok) {
+                openCvReady = true
+            }
+            return ok
+        }
+
+        fun getInstance(context: Context): CardScannerManager {
+            val existing = instance
+            if (existing != null) {
+                return existing
+            }
+            return synchronized(this) {
+                instance ?: CardScannerManager(context.applicationContext).also { instance = it }
+            }
+        }
+
+        private val TEMP_FILE_PREFIXES =
+            arrayOf(
+                "card_manual_crop_",
+                "card_scan_",
+                "ekyc_card_warp_",
+                "img_cmp_",
+                "img_src_",
+            )
+    }
+
     private val executor = Executors.newSingleThreadExecutor()
 
-    @Volatile
-    private var openCvReady = false
     private var eventListener: CardScannerEventListener? = null
-    private var lastProcessedTimestamp = 0L
 
     private val recognizer by lazy {
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -48,17 +94,7 @@ class CardScannerManager private constructor(private val context: Context) {
     @Volatile
     var lastOcrExecutionTime = 0L
 
-    private var lastSuccessfulScanTime = 0L
-    private var cachedSide: String? = null
-    private var cachedFrontScore = 0.0
-    private var cachedBackScore = 0.0
-    private var cachedImagePath: String? = null
-    private var cachedBlurScore = 0.0
-    private var cachedGlarePercent = 0.0
-    private var cachedAppliedX = 0
-    private var cachedAppliedY = 0
-    private var cachedAppliedW = 0
-    private var cachedAppliedH = 0
+
 
     private var lastCorners: Array<org.opencv.core.Point>? = null
 
@@ -66,60 +102,7 @@ class CardScannerManager private constructor(private val context: Context) {
         currentFrameIndex++
     }
 
-    fun cacheScanResult(
-        imagePath: String,
-        side: String,
-        frontScore: Double,
-        backScore: Double,
-        blurScore: Double,
-        glarePercent: Double,
-        x: Int,
-        y: Int,
-        w: Int,
-        h: Int
-    ) {
-        lastSuccessfulScanTime = System.currentTimeMillis()
-        cachedImagePath = imagePath
-        cachedSide = side
-        cachedFrontScore = frontScore
-        cachedBackScore = backScore
-        cachedBlurScore = blurScore
-        cachedGlarePercent = glarePercent
-        cachedAppliedX = x
-        cachedAppliedY = y
-        cachedAppliedW = w
-        cachedAppliedH = h
-    }
 
-    fun hasValidCachedResult(maxAgeMs: Long): Boolean {
-        val path = cachedImagePath
-        if (path.isNullOrBlank()) return false
-        val age = System.currentTimeMillis() - lastSuccessfulScanTime
-        return age in 0..maxAgeMs
-    }
-
-    fun getCachedResultMap(): Map<String, Any>? {
-        val path = cachedImagePath ?: return null
-        return mapOf(
-            "croppedImagePath" to path,
-            "side" to (cachedSide ?: "unknown"),
-            "sideFrontScore" to cachedFrontScore,
-            "sideBackScore" to cachedBackScore,
-            "blurScore" to cachedBlurScore,
-            "glarePercent" to cachedGlarePercent,
-            "appliedX" to cachedAppliedX,
-            "appliedY" to cachedAppliedY,
-            "appliedW" to cachedAppliedW,
-            "appliedH" to cachedAppliedH
-        )
-    }
-
-    fun clearCache() {
-        cachedImagePath = null
-        cachedSide = null
-        cachedFrontScore = 0.0
-        cachedBackScore = 0.0
-    }
 
     fun clearCorners() {
         lastCorners = null
@@ -215,7 +198,7 @@ class CardScannerManager private constructor(private val context: Context) {
                         pt.x -= pad
                         pt.y -= pad
                     }
-                    corners = pts
+                    corners = CardQuadOrdering.orderQuadPoints(pts)
                 } else {
                     Log.i(LOG_TAG, "detectCardCorners: failed criteria: aspect=$aspectRatio (ok=$isCardAspectRatio, expected 1.2..2.1), rectangularity=$rectangularity (ok=$isRectangularEnough, expected >= 0.70)")
                 }
@@ -241,8 +224,8 @@ class CardScannerManager private constructor(private val context: Context) {
 
     fun calculateCornerDrift(current: Array<org.opencv.core.Point>, last: Array<org.opencv.core.Point>, width: Double): Double {
         if (current.size != 4 || last.size != 4) return 1.0
-        val sortedCurrent = sortCorners(current)
-        val sortedLast = sortCorners(last)
+        val sortedCurrent = CardQuadOrdering.orderQuadPoints(current)
+        val sortedLast = CardQuadOrdering.orderQuadPoints(last)
 
         var maxDrift = 0.0
         for (i in 0 until 4) {
@@ -256,105 +239,60 @@ class CardScannerManager private constructor(private val context: Context) {
         return maxDrift / width
     }
 
-    private fun sortCorners(pts: Array<org.opencv.core.Point>): Array<org.opencv.core.Point> {
-        val sorted = Array(4) { org.opencv.core.Point() }
-        sorted[0] = pts.minByOrNull { it.x + it.y } ?: pts[0]
-        sorted[2] = pts.maxByOrNull { it.x + it.y } ?: pts[2]
-        sorted[1] = pts.minByOrNull { it.y - it.x } ?: pts[1]
-        sorted[3] = pts.maxByOrNull { it.y - it.x } ?: pts[3]
-        return sorted
+    fun computeGuideCropRect(
+        frameW: Int,
+        frameH: Int,
+        previewWidth: Double,
+        previewHeight: Double,
+        guideX: Double,
+        guideY: Double,
+        guideWidth: Double,
+        guideHeight: Double,
+        outset: Double = 0.125
+    ): Rect {
+        val scale = maxOf(previewWidth / frameW, previewHeight / frameH)
+        val drawnW = frameW * scale
+        val drawnH = frameH * scale
+        val offX = (previewWidth - drawnW) / 2.0
+        val offY = (previewHeight - drawnH) / 2.0
+
+        var rx = (guideX - offX) / scale
+        var ry = (guideY - offY) / scale
+        var rw = guideWidth / scale
+        var rh = guideHeight / scale
+
+        val wantDx = rw * outset
+        val wantDy = rh * outset
+        val maxDx = minOf(rx, frameW - rx - rw)
+        val maxDy = minOf(ry, frameH - ry - rh)
+        val dx = minOf(wantDx, maxDx)
+        val dy = minOf(wantDy, maxDy)
+
+        rx -= dx
+        ry -= dy
+        rw += 2.0 * dx
+        rh += 2.0 * dy
+
+        val cropX = Math.round(rx).toInt().coerceIn(0, max(0, frameW - 1))
+        val cropY = Math.round(ry).toInt().coerceIn(0, max(0, frameH - 1))
+        val cropW = Math.round(rw).toInt().coerceIn(1, max(1, frameW - cropX))
+        val cropH = Math.round(rh).toInt().coerceIn(1, max(1, frameH - cropY))
+
+        return Rect(cropX, cropY, cropW, cropH)
     }
 
-    fun checkCardStability(mat: Mat): Boolean {
-        return checkDocumentPresenceAndStability(mat).isStable
-    }
-
-    companion object {
-        private const val LOG_TAG = "EkycCardScanner"
-
-        @Volatile
-        private var instance: CardScannerManager? = null
-
-        fun getInstance(context: Context): CardScannerManager {
-            val existing = instance
-            if (existing != null) {
-                return existing
-            }
-            return synchronized(this) {
-                instance ?: CardScannerManager(context.applicationContext).also { instance = it }
-            }
+    fun getQualityErrorMessage(errorCode: String): String =
+        when (errorCode) {
+            "IMAGE_TOO_BLURRY" -> "Hình ảnh bị mờ nhòe, vui lòng giữ yên thiết bị"
+            "IMAGE_HAS_MOTION_BLUR" -> "Hình ảnh bị nhòe do chuyển động, vui lòng chụp lại"
+            "IMAGE_TOO_DARK" -> "Hình ảnh quá tối, vui lòng chụp ở nơi đủ sáng"
+            "IMAGE_TOO_BRIGHT" -> "Hình ảnh quá sáng, vui lòng điều chỉnh ánh sáng"
+            "IMAGE_LOW_CONTRAST" -> "Độ tương phản thấp, vui lòng đặt thẻ trên nền tương phản"
+            "IMAGE_HAS_GLARE" -> "Hình ảnh bị lóa sáng, vui lòng điều chỉnh góc chụp"
+            else -> "Chất lượng hình ảnh không đạt yêu cầu"
         }
 
-        private val TEMP_FILE_PREFIXES =
-            arrayOf(
-                "card_manual_crop_",
-                "card_scan_",
-                "ekyc_card_warp_",
-                "img_cmp_",
-                "img_src_",
-            )
-    }
 
-    data class DocumentPresenceAndStability(
-        val isPresent: Boolean,
-        val isStable: Boolean,
-        val corners: Array<org.opencv.core.Point>? = null
-    )
-
-    data class CropJpegOnlyResult(
-        val success: Boolean,
-        val croppedAbsolutePath: String?,
-        val appliedX: Int,
-        val appliedY: Int,
-        val appliedW: Int,
-        val appliedH: Int,
-        val errorCode: String?,
-        val errorMessage: String?,
-        val debugDecodedWidth: Int = 0,
-        val debugDecodedHeight: Int = 0,
-        val debugExifOrientation: Int? = null,
-        val debugNormalizedWidth: Int? = null,
-        val debugNormalizedHeight: Int? = null,
-        val debugCropCoordinateSpace: String = "raw",
-        val debugBufferOrientation: String? = null,
-        val debugExpectedUprightWidth: Int? = null,
-        val debugExpectedUprightHeight: Int? = null,
-        val debugSkippedUprightRotation: Boolean = false,
-        val debugSourcePhotoWidth: Int = 0,
-        val debugSourcePhotoHeight: Int = 0,
-        val side: String? = null,
-        val sideFrontScore: Double? = null,
-        val sideBackScore: Double? = null,
-        val blurScore: Double? = null,
-        val glarePercent: Double? = null,
-    )
-
-    interface CardScannerEventListener {
-        fun onCardCaptured(
-            croppedImagePath: String,
-            blurScore: Double,
-            glarePercent: Double,
-            appliedX: Int,
-            appliedY: Int,
-            appliedWidth: Int,
-            appliedHeight: Int,
-            side: String,
-            sideFrontScore: Double,
-            sideBackScore: Double
-        )
-
-        fun onCardCaptureFailed(errorCode: String, errorMessage: String)
-    }
-
-    interface CropCallback {
-        fun onSuccess(result: Map<String, Any>)
-        fun onFailure(errorCode: String, errorMessage: String, debugDetails: Map<String, Any>?)
-    }
-
-    interface CleanupCallback {
-        fun onSuccess(deleted: Int, skipped: Int)
-        fun onFailure(throwable: Throwable)
-    }
 
     fun setEventListener(listener: CardScannerEventListener?) {
         this.eventListener = listener
@@ -611,15 +549,7 @@ class CardScannerManager private constructor(private val context: Context) {
 
             val qualityError = validateQuality(cloned)
             if (qualityError != null) {
-                val errorMsg = when (qualityError) {
-                    "IMAGE_TOO_BLURRY" -> "Hình ảnh bị mờ nhòe, vui lòng giữ yên thiết bị"
-                    "IMAGE_HAS_MOTION_BLUR" -> "Hình ảnh bị nhòe do chuyển động, vui lòng chụp lại"
-                    "IMAGE_TOO_DARK" -> "Hình ảnh quá tối, vui lòng chụp ở nơi đủ sáng"
-                    "IMAGE_TOO_BRIGHT" -> "Hình ảnh quá sáng, vui lòng điều chỉnh ánh sáng"
-                    "IMAGE_LOW_CONTRAST" -> "Độ tương phản thấp, vui lòng đặt thẻ trên nền tương phản"
-                    "IMAGE_HAS_GLARE" -> "Hình ảnh bị lóa sáng, vui lòng điều chỉnh góc chụp"
-                    else -> "Chất lượng hình ảnh không đạt yêu cầu"
-                }
+                val errorMsg = getQualityErrorMessage(qualityError)
                 return CropJpegOnlyResult(
                     success = false,
                     croppedAbsolutePath = null,
@@ -696,8 +626,7 @@ class CardScannerManager private constructor(private val context: Context) {
                 )
             }
 
-            val finalBlur = computeBlurScore(cloned)
-            val finalGlare = computeGlarePercent(cloned)
+            val (finalBlur, finalGlare) = computeBlurAndGlare(cloned)
 
             return CropJpegOnlyResult(
                 success = true,
@@ -924,23 +853,9 @@ class CardScannerManager private constructor(private val context: Context) {
         return Pair(blur, glare)
     }
 
-    //dùng cho autocapture
-    fun computeBlurScore(mat: Mat): Double {
-        val gray = Mat()
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
-        val blur = computeBlurScoreFromGray(gray)
-        gray.release()
-        return blur
-    }
+    fun computeBlurScore(mat: Mat): Double = computeBlurAndGlare(mat).first
 
-    //dùng cho autocapture
-    fun computeGlarePercent(mat: Mat): Double {
-        val gray = Mat()
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
-        val glare = computeGlarePercentFromGray(gray)
-        gray.release()
-        return glare
-    }
+    fun computeGlarePercent(mat: Mat): Double = computeBlurAndGlare(mat).second
 
     // --- Background Tasks ---
 
@@ -1053,51 +968,27 @@ class CardScannerManager private constructor(private val context: Context) {
                 val frameW = uprightMat.cols()
                 val frameH = uprightMat.rows()
 
-                // Cover mode layout mapping logic
-                val scale = maxOf(previewWidth / frameW, previewHeight / frameH)
-                val drawnW = frameW * scale
-                val drawnH = frameH * scale
-                val offX = (previewWidth - drawnW) / 2.0
-                val offY = (previewHeight - drawnH) / 2.0
+                val cropRect = computeGuideCropRect(
+                    frameW = frameW,
+                    frameH = frameH,
+                    previewWidth = previewWidth,
+                    previewHeight = previewHeight,
+                    guideX = guideX,
+                    guideY = guideY,
+                    guideWidth = guideWidth,
+                    guideHeight = guideHeight
+                )
+                val cropX = cropRect.x
+                val cropY = cropRect.y
+                val cropW = cropRect.width
+                val cropH = cropRect.height
 
-                var rx = (guideX - offX) / scale
-                var ry = (guideY - offY) / scale
-                var rw = guideWidth / scale
-                var rh = guideHeight / scale
-
-                // Outset expansion
-                val outset = 0.125
-                val wantDx = rw * outset
-                val wantDy = rh * outset
-                val maxDx = minOf(rx, frameW - rx - rw)
-                val maxDy = minOf(ry, frameH - ry - rh)
-                val dx = minOf(wantDx, maxDx)
-                val dy = minOf(wantDy, maxDy)
-
-                rx -= dx
-                ry -= dy
-                rw += 2.0 * dx
-                rh += 2.0 * dy
-
-                val cropX = Math.round(rx).toInt().coerceIn(0, max(0, frameW - 1))
-                val cropY = Math.round(ry).toInt().coerceIn(0, max(0, frameH - 1))
-                val cropW = Math.round(rw).toInt().coerceIn(1, max(1, frameW - cropX))
-                val cropH = Math.round(rh).toInt().coerceIn(1, max(1, frameH - cropY))
-
-                croppedMat = Mat(uprightMat, Rect(cropX, cropY, cropW, cropH))
+                croppedMat = Mat(uprightMat, cropRect)
 
                 val qualityError = validateQuality(croppedMat)
                 if (qualityError != null) {
                     Log.w("EkycCardScanner", "validateQuality failed: $qualityError")
-                    val errorMsg = when (qualityError) {
-                        "IMAGE_TOO_BLURRY" -> "Hình ảnh bị mờ nhòe, vui lòng giữ yên thiết bị"
-                        "IMAGE_HAS_MOTION_BLUR" -> "Hình ảnh bị nhòe do chuyển động, vui lòng chụp lại"
-                        "IMAGE_TOO_DARK" -> "Hình ảnh quá tối, vui lòng chụp ở nơi đủ sáng"
-                        "IMAGE_TOO_BRIGHT" -> "Hình ảnh quá sáng, vui lòng điều chỉnh ánh sáng"
-                        "IMAGE_LOW_CONTRAST" -> "Độ tương phản thấp, vui lòng đặt thẻ trên nền tương phản"
-                        "IMAGE_HAS_GLARE" -> "Hình ảnh bị lóa sáng, vui lòng điều chỉnh góc chụp"
-                        else -> "Chất lượng hình ảnh không đạt yêu cầu"
-                    }
+                    val errorMsg = getQualityErrorMessage(qualityError)
                     eventListener?.onCardCaptureFailed(qualityError, errorMsg)
                     return@execute
                 }
@@ -1115,19 +1006,7 @@ class CardScannerManager private constructor(private val context: Context) {
                 val outFile = File(context.cacheDir, "card_scan_${UUID.randomUUID()}.jpg")
                 val saved = Imgcodecs.imwrite(outFile.absolutePath, croppedMat)
                 if (saved) {
-                    Log.i("EkycCardScanner", "saveAndCropCardAsync succeeded! Cached and Emitting success event.")
-                    cacheScanResult(
-                        "file://${outFile.absolutePath}",
-                        ocrRes.side,
-                        ocrRes.frontScore,
-                        ocrRes.backScore,
-                        blurVal,
-                        glarePct,
-                        cropX,
-                        cropY,
-                        cropW,
-                        cropH
-                    )
+                    Log.i("EkycCardScanner", "saveAndCropCardAsync succeeded! Emitting success event.")
                     eventListener?.onCardCaptured(
                         "file://${outFile.absolutePath}",
                         blurVal,
@@ -1248,42 +1127,25 @@ class CardScannerManager private constructor(private val context: Context) {
         Core.meanStdDev(gray, mean, stddev)
         val meanVal = mean.toArray()[0]
         val stddevVal = stddev.toArray()[0]
+        mean.release()
+        stddev.release()
 
         if (meanVal < 58.0) {
             gray.release()
-            mean.release()
-            stddev.release()
             return "IMAGE_TOO_DARK"
         }
         if (meanVal > 220.0) {
             gray.release()
-            mean.release()
-            stddev.release()
             return "IMAGE_TOO_BRIGHT"
         }
         if (stddevVal < 12.0) {
             gray.release()
-            mean.release()
-            stddev.release()
             return "IMAGE_LOW_CONTRAST"
         }
 
-        val laplacian = Mat()
-        Imgproc.Laplacian(gray, laplacian, CvType.CV_64F)
-        val lapMean = MatOfDouble()
-        val lapStddev = MatOfDouble()
-        Core.meanStdDev(laplacian, lapMean, lapStddev)
-        val lapStdVal = lapStddev.toArray()[0]
-        val blurVariance = lapStdVal * lapStdVal
-
-        laplacian.release()
-        lapMean.release()
-        lapStddev.release()
-
+        val blurVariance = computeBlurScoreFromGray(gray)
         if (blurVariance < 80.0) {
             gray.release()
-            mean.release()
-            stddev.release()
             return "IMAGE_TOO_BLURRY"
         }
 
@@ -1306,14 +1168,10 @@ class CardScannerManager private constructor(private val context: Context) {
         val motionScore = if (sumX + sumY > 0) Math.abs(sumX - sumY) / (sumX + sumY) else 0.0
         if (motionScore > 0.82 && blurVariance < 124.0) {
             gray.release()
-            mean.release()
-            stddev.release()
             return "IMAGE_HAS_MOTION_BLUR"
         }
 
         gray.release()
-        mean.release()
-        stddev.release()
 
         val hsv = Mat()
         Imgproc.cvtColor(mat, hsv, Imgproc.COLOR_BGR2HSV)
@@ -1383,7 +1241,7 @@ class CardScannerManager private constructor(private val context: Context) {
             null
         }
 
-    private fun normalizeToUprightMat(src: Mat, orientation: String): Mat {
+    fun normalizeToUprightMat(src: Mat, orientation: String): Mat {
         val out = Mat()
         when (orientation) {
             "portrait" -> src.copyTo(out)
@@ -1393,24 +1251,6 @@ class CardScannerManager private constructor(private val context: Context) {
             else -> src.copyTo(out)
         }
         return out
-    }
-
-    private fun initOpenCv(): Boolean {
-        if (openCvReady) return true
-        val ok =
-            try {
-                OpenCVLoader.initLocal()
-            } catch (_: Throwable) {
-                try {
-                    OpenCVLoader.initDebug()
-                } catch (_: Throwable) {
-                    false
-                }
-            }
-        if (ok) {
-            openCvReady = true
-        }
-        return ok
     }
 
     private fun stripFileScheme(p: String): String {

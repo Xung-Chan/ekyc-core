@@ -309,4 +309,66 @@ sealed interface CardCapturedEvent {
             }
         }
     }
-}
+}
+
+
+data class DocumentPresenceAndStability(
+    val isPresent: Boolean,
+    val isStable: Boolean,
+    val corners: Array<org.opencv.core.Point>? = null
+)
+
+data class CropJpegOnlyResult(
+    val success: Boolean,
+    val croppedAbsolutePath: String?,
+    val appliedX: Int,
+    val appliedY: Int,
+    val appliedW: Int,
+    val appliedH: Int,
+    val errorCode: String?,
+    val errorMessage: String?,
+    val debugDecodedWidth: Int = 0,
+    val debugDecodedHeight: Int = 0,
+    val debugExifOrientation: Int? = null,
+    val debugNormalizedWidth: Int? = null,
+    val debugNormalizedHeight: Int? = null,
+    val debugCropCoordinateSpace: String = "raw",
+    val debugBufferOrientation: String? = null,
+    val debugExpectedUprightWidth: Int? = null,
+    val debugExpectedUprightHeight: Int? = null,
+    val debugSkippedUprightRotation: Boolean = false,
+    val debugSourcePhotoWidth: Int = 0,
+    val debugSourcePhotoHeight: Int = 0,
+    val side: String? = null,
+    val sideFrontScore: Double? = null,
+    val sideBackScore: Double? = null,
+    val blurScore: Double? = null,
+    val glarePercent: Double? = null,
+)
+
+interface CardScannerEventListener {
+    fun onCardCaptured(
+        croppedImagePath: String,
+        blurScore: Double,
+        glarePercent: Double,
+        appliedX: Int,
+        appliedY: Int,
+        appliedWidth: Int,
+        appliedHeight: Int,
+        side: String,
+        sideFrontScore: Double,
+        sideBackScore: Double
+    )
+
+    fun onCardCaptureFailed(errorCode: String, errorMessage: String)
+}
+
+interface CropCallback {
+    fun onSuccess(result: Map<String, Any>)
+    fun onFailure(errorCode: String, errorMessage: String, debugDetails: Map<String, Any>?)
+}
+
+interface CleanupCallback {
+    fun onSuccess(deleted: Int, skipped: Int)
+    fun onFailure(throwable: Throwable)
+}

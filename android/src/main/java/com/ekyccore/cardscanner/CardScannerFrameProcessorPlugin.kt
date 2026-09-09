@@ -19,15 +19,14 @@ class CardScannerFrameProcessorPlugin(
 ) : FrameProcessorPlugin() {
 
     private var lastProcessedTimestamp = 0L
-    private var openCvReady = false
     private var reusableNv21Bytes: ByteArray? = null
 
     init {
-        initOpenCv()
+        CardScannerManager.initOpenCv()
     }
 
     override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
-        if (!initOpenCv() || arguments == null) {
+        if (!CardScannerManager.initOpenCv() || arguments == null) {
             return null
         }
         val params = ScanCardFrameParams.fromMap(arguments)
@@ -60,15 +59,6 @@ class CardScannerFrameProcessorPlugin(
         manager.incrementFrameIndex()
 
         val frameIndex = manager.currentFrameIndex
-        val isStableCached = manager.hasValidCachedResult(30000L)
-        if (isStableCached && frameIndex % 5 != 0L) {
-            bgrMat.release()
-            return hashMapOf(
-                "isDocumentPresent" to true,
-                "errorCode" to "",
-                "errorMessage" to ""
-            )
-        }
 
         // Extract layout guidelines and quality parameters
 
@@ -81,47 +71,23 @@ class CardScannerFrameProcessorPlugin(
         var glarePct = 0.0
 
         try {
-            uprightMat = normalizeToUprightMat(bgrMat, params.bufferOrientation)
+            uprightMat = manager.normalizeToUprightMat(bgrMat, params.bufferOrientation)
 
-            val frameW = uprightMat.cols()
-            val frameH = uprightMat.rows()
+            val cropRect = manager.computeGuideCropRect(
+                frameW = uprightMat.cols(),
+                frameH = uprightMat.rows(),
+                previewWidth = params.previewWidth,
+                previewHeight = params.previewHeight,
+                guideX = params.guideX,
+                guideY = params.guideY,
+                guideWidth = params.guideWidth,
+                guideHeight = params.guideHeight
+            )
 
-            val scale = maxOf(params.previewWidth / frameW, params.previewHeight / frameH)
-            val drawnW = frameW * scale
-            val drawnH = frameH * scale
-            val offX = (params.previewWidth - drawnW) / 2.0
-            val offY = (params.previewHeight - drawnH) / 2.0
-
-            var rx = (params.guideX - offX) / scale
-            var ry = (params.guideY - offY) / scale
-            var rw = params.guideWidth / scale
-            var rh = params.guideHeight / scale
-
-            val outset = 0.125
-            val wantDx = rw * outset
-            val wantDy = rh * outset
-            val maxDx = minOf(rx, frameW - rx - rw)
-            val maxDy = minOf(ry, frameH - ry - rh)
-            val dx = minOf(wantDx, maxDx)
-            val dy = minOf(wantDy, maxDy)
-
-            rx -= dx
-            ry -= dy
-            rw += 2.0 * dx
-            rh += 2.0 * dy
-
-            val cropX = Math.round(rx).toInt().coerceIn(0, frameW - 1)
-            val cropY = Math.round(ry).toInt().coerceIn(0, frameH - 1)
-            val cropW = Math.round(rw).toInt().coerceIn(1, frameW - cropX)
-            val cropH = Math.round(rh).toInt().coerceIn(1, frameH - cropY)
-
-            croppedMat = Mat(uprightMat, org.opencv.core.Rect(cropX, cropY, cropW, cropH))
+            croppedMat = Mat(uprightMat, cropRect)
 
             val docCheck = manager.checkDocumentPresenceAndStability(croppedMat)
             isDoc = docCheck.isPresent
-            if (!isDoc) {
-                manager.clearCache()
-            }
 
             val (bVal, gPct) = manager.computeBlurAndGlare(croppedMat)
             blurVal = bVal
@@ -194,17 +160,7 @@ class CardScannerFrameProcessorPlugin(
         )
     }
 
-    private fun normalizeToUprightMat(src: Mat, orientation: String): Mat {
-        val out = Mat()
-        when (orientation) {
-            "portrait" -> src.copyTo(out)
-            "landscape-right" -> org.opencv.core.Core.rotate(src, out, org.opencv.core.Core.ROTATE_90_CLOCKWISE)
-            "landscape-left" -> org.opencv.core.Core.rotate(src, out, org.opencv.core.Core.ROTATE_90_COUNTERCLOCKWISE)
-            "portrait-upside-down" -> org.opencv.core.Core.rotate(src, out, org.opencv.core.Core.ROTATE_180)
-            else -> src.copyTo(out)
-        }
-        return out
-    }
+
 
     private fun yuvToBgr(image: Image): Mat {
         val width = image.width
@@ -267,20 +223,4 @@ class CardScannerFrameProcessorPlugin(
         return bgrMat
     }
 
-    private fun initOpenCv(): Boolean {
-        if (openCvReady) return true
-        val ok = try {
-            OpenCVLoader.initLocal()
-        } catch (_: Throwable) {
-            try {
-                OpenCVLoader.initDebug()
-            } catch (_: Throwable) {
-                false
-            }
-        }
-        if (ok) {
-            openCvReady = true
-        }
-        return ok
-    }
 }

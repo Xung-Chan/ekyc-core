@@ -14,7 +14,7 @@ import com.mrousavy.camera.frameprocessors.FrameProcessorPluginRegistry
 
 @ReactModule(name = CardScannerModule.NAME)
 class CardScannerModule(private val reactContext: ReactApplicationContext) :
-    NativeCardScannerSpec(reactContext), CardScannerManager.CardScannerEventListener {
+    NativeCardScannerSpec(reactContext), CardScannerEventListener {
     //todo dependency injection
     private val manager = CardScannerManager.getInstance(reactContext)
 
@@ -78,7 +78,7 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
             sourcePhotoH = dto.sourcePhotoHeight,
             debugGallery = dto.manualCaptureDebugSaveToGallery,
             expectedSide = dto.expectedSide,
-            callback = object : CardScannerManager.CropCallback {
+            callback = object : CropCallback {
                 override fun onSuccess(result: Map<String, Any>) {
                     promise?.resolve(mapToWritableMap(result))
                 }
@@ -112,7 +112,7 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
             }
         }
 
-        manager.deleteLocalImages(list, object : CardScannerManager.CleanupCallback {
+        manager.deleteLocalImages(list, object : CleanupCallback {
             override fun onSuccess(deleted: Int, skipped: Int) {
                 promise?.resolve(
                     Arguments.createMap().apply {
@@ -144,7 +144,7 @@ class CardScannerModule(private val reactContext: ReactApplicationContext) :
             list
         }
 
-        manager.scrubCardScannerTempFiles(excludeList, object : CardScannerManager.CleanupCallback {
+        manager.scrubCardScannerTempFiles(excludeList, object : CleanupCallback {
             override fun onSuccess(deleted: Int, skipped: Int) {
                 promise?.resolve(
                     Arguments.createMap().apply {
