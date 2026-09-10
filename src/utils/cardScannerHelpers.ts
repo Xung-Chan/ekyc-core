@@ -67,21 +67,11 @@ export function manualCropOnlyToScanResult(
 ): ScanCardResult {
   return {
     success: r.success,
-    originalImagePath: r.originalImagePath || originalPath,
     croppedImagePath: r.croppedImagePath,
-    side: r.side || expectedSide || 'unknown',
-    sideFrontScore: r.sideFrontScore ?? 0,
-    sideBackScore: r.sideBackScore ?? 0,
-    quality: {
-      passed: r.success,
-      blurScore: r.blurScore ?? 0,
-      motionScore: 0,
-      glareScore: (r.glarePercent ?? 0) * 100,
-      exposure: 'ok',
-      reasons: r.success ? [] : [r.errorCode ?? 'CROP_FAILED'],
-    },
-    appliedCrop: r.appliedCrop,
-    manualCaptureDebugSavedToGallery: r.debugSavedToGallery,
+    originalImagePath: r.originalImagePath || originalPath,
+    side: (r.side as 'front' | 'back') || expectedSide || 'unknown',
+    blurScore: r.blurScore,
+    glarePercent: r.glarePercent,
     errorCode: r.errorCode,
     errorMessage: r.errorMessage,
   };

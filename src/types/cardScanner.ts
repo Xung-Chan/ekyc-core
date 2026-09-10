@@ -50,21 +50,11 @@ export type CropCardImageOnlyResult = {
 
 export type ScanCardResult = {
   success: boolean;
-  originalImagePath: string;
   croppedImagePath?: string;
-  side: string;
-  sideFrontScore: number;
-  sideBackScore: number;
-  quality: {
-    passed: boolean;
-    blurScore: number;
-    motionScore: number;
-    glareScore: number;
-    exposure: string;
-    reasons: string[];
-  };
-  appliedCrop?: CropRect;
-  manualCaptureDebugSavedToGallery: boolean;
+  originalImagePath?: string;
+  side: 'front' | 'back' | 'unknown';
+  blurScore?: number;
+  glarePercent?: number;
   errorCode?: string;
   errorMessage?: string;
 };

@@ -81,33 +81,18 @@ export function useCardScannerCapture({
     const subscriptionCapture = cardScannerEmitter.addListener(
       EVENTS_NAME.CARD_CAPTURED,
       async (event: CardCapturedEvent) => {
-        if (busy || captureLockRef.current) return;
+        if (captureLockRef.current) return;
 
         if (event.success) {
           captureLockRef.current = true;
           setBusy(true);
           const scanResult: ScanCardResult = {
             success: true,
-            originalImagePath: event.croppedImagePath,
             croppedImagePath: event.croppedImagePath,
-            side: event.side || expectedSide || 'unknown',
-            sideFrontScore: event.sideFrontScore,
-            sideBackScore: event.sideBackScore,
-            quality: {
-              passed: true,
-              blurScore: event.blurScore,
-              motionScore: 0.0,
-              glareScore: event.glarePercent * 100,
-              exposure: 'ok',
-              reasons: [],
-            },
-            appliedCrop: {
-              x: event.appliedCrop.x,
-              y: event.appliedCrop.y,
-              width: event.appliedCrop.width,
-              height: event.appliedCrop.height,
-            },
-            manualCaptureDebugSavedToGallery: false,
+            originalImagePath: event.croppedImagePath,
+            side: (event.side as 'front' | 'back') || expectedSide || 'unknown',
+            blurScore: event.blurScore,
+            glarePercent: event.glarePercent,
           };
           onPhotoCaptured?.(event.croppedImagePath, scanResult);
           captureLockRef.current = false;
@@ -117,19 +102,7 @@ export function useCardScannerCapture({
           setBusy(true);
           const scanResult: ScanCardResult = {
             success: false,
-            originalImagePath: '',
             side: expectedSide ?? 'unknown',
-            sideFrontScore: 0,
-            sideBackScore: 0,
-            quality: {
-              passed: false,
-              blurScore: 0.0,
-              motionScore: 0.0,
-              glareScore: 0.0,
-              exposure: 'ok',
-              reasons: [event.errorCode ?? 'QUALITY_FAILED'],
-            },
-            manualCaptureDebugSavedToGallery: false,
             errorCode: event.errorCode,
             errorMessage: event.errorMessage,
           };
@@ -143,12 +116,12 @@ export function useCardScannerCapture({
     return () => {
       subscriptionCapture.remove();
     };
-  }, [autocapture, isActive, expectedSide, onPhotoCaptured, busy]);
+  }, [autocapture, isActive, expectedSide, onPhotoCaptured]);
 
   const frameProcessor = useFrameProcessor(
     (frame) => {
       'worklet';
-      if (busy || captureLockRef.current) {
+      if (captureLockRef.current) {
         return;
       }
       runAsync(frame, () => {
@@ -176,11 +149,11 @@ export function useCardScannerCapture({
         }
       });
     },
-    [previewSize, overlayGuide, busy, onFrameValidatedJS, expectedSide]
+    [previewSize, overlayGuide, onFrameValidatedJS, expectedSide]
   );
 
   const takePhoto = useCallback(async (): Promise<string | null> => {
-    if (!cameraRef.current || busy || captureLockRef.current) {
+    if (!cameraRef.current || captureLockRef.current) {
       return null;
     }
     captureLockRef.current = true;
@@ -227,14 +200,7 @@ export function useCardScannerCapture({
       captureLockRef.current = false;
       setBusy(false);
     }
-  }, [
-    busy,
-    previewSize,
-    overlayGuide,
-    expectedSide,
-    onPhotoCaptured,
-    cameraRef,
-  ]);
+  }, [previewSize, overlayGuide, expectedSide, onPhotoCaptured, cameraRef]);
 
   const start = useCallback(() => {
     captureLockRef.current = false;

@@ -291,21 +291,11 @@ Kết quả phân tích toàn diện sau khi chụp và xử lý thẻ:
 ```typescript
 export type ScanCardResult = {
   success: boolean;               // Quét thẻ thành công (đủ 4 góc, đúng mặt và đạt chuẩn chất lượng)
-  originalImagePath: string;      // Đường dẫn file ảnh gốc chưa crop từ camera
   croppedImagePath?: string;      // Đường dẫn file ảnh đã được crop phối cảnh theo 4 góc thẻ
-  side: string;                   // Nhận diện mặt thẻ thực tế ('front' | 'back' | 'unknown')
-  sideFrontScore: number;         // Điểm số nhận diện từ khóa mặt trước
-  sideBackScore: number;          // Điểm số nhận diện từ khóa mặt sau
-  quality: {
-    passed: boolean;              // Ảnh có đạt toàn bộ tiêu chuẩn chất lượng hay không
-    blurScore: number;            // Phương sai Laplacian (càng cao càng nét, ngưỡng >= 150.0 trong live scan hoặc >= 80.0 trong pipeline)
-    motionScore: number;          // Điểm nhòe do chuyển động
-    glareScore: number;           // Tỷ lệ vùng bị lóa sáng (%)
-    exposure: string;             // Đánh giá phơi sáng ("ok", "dark", "bright")
-    reasons: string[];            // Danh sách mã lý do từ chối chất lượng ảnh nếu có
-  };
-  appliedCrop?: CropRect;         // Tọa độ và kích thước vùng crop đã áp dụng
-  manualCaptureDebugSavedToGallery: boolean;
+  originalImagePath?: string;     // Đường dẫn file ảnh gốc chưa crop từ camera (nếu có)
+  side: 'front' | 'back' | 'unknown'; // Nhận diện mặt thẻ thực tế
+  blurScore?: number;             // Phương sai Laplacian đo độ nét (càng cao càng nét)
+  glarePercent?: number;          // Tỷ lệ vùng bị lóa sáng (%)
   errorCode?: string;             // Mã lỗi nếu thất bại (xem bảng danh mục mã lỗi bên dưới)
   errorMessage?: string;          // Thông báo lỗi chi tiết
 };
